@@ -111,9 +111,9 @@ def render_html(payload: dict) -> str:
   a {{ color:#9db4ff; }}
   .info {{ position:relative; cursor:help; color:#8a93a6; margin-left:.25rem; }}
   .info .tip {{ display:none; position:absolute; left:0; top:1.5em; z-index:10;
-    width:300px; max-width:70vw; max-height:220px; overflow-y:auto;
-    background:#0b0e14; border:1px solid #2b3650; border-radius:8px; padding:.6rem .7rem;
-    font-size:.72rem; line-height:1.6; color:#cbd5e1; font-weight:400;
+    width:380px; max-width:85vw; max-height:70vh; overflow-y:auto;
+    background:#0b0e14; border:1px solid #2b3650; border-radius:8px; padding:.7rem .8rem;
+    font-size:.75rem; line-height:1.7; color:#cbd5e1; font-weight:400;
     box-shadow:0 8px 28px rgba(0,0,0,.6); }}
   .info:hover .tip {{ display:block; }}
   footer {{ margin-top:2rem; color:#8a93a6; font-size:.8rem; }}
