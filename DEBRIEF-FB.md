@@ -14,7 +14,7 @@
 | **M1 — Lecture** | ✅ | client info API + snapshot (93 coins) + 8 tests verts |
 | **M2 — Diff & persistance** | ✅ | moteur de diff + persistance Postgres (asyncpg). Baseline survit au redémarrage (seed seulement si base vide). 25 tests verts, validé en live |
 | **M3 — Notifications** | ✅ | templates + envoi Telegram, **envoi réel validé** sur le canal de broadcast « XYZ Deployer Alerts » (@tradexyz_alerts_bot, bot admin) |
-| **M4 — Daemon & déploiement** | ✅ (code) · ⏳ (déploiement) | boucle durcie (backoff, heartbeat, arrêt propre), unit systemd + runbook. Reste à déployer sur la VM Hostinger (en cours de provisioning) |
+| **M4 — Daemon & déploiement** | ✅ | **déployé en prod** sur VPS Hostinger (Ubuntu 24.04), systemd actif + au boot, Postgres locale, envoi réel Telegram. Tourne 24/7 |
 | M5 — Durcissement | ⬜ | rate limits, reconnections, alerte API down |
 
 ---
@@ -55,3 +55,4 @@
 - **2026-06-21** — M3 **terminé** : bot `@tradexyz_alerts_bot` créé, token + chat_id configurés (`.env` local non commité), envoi réel validé (2 messages reçus). Cible actuelle = chat privé de test ; à terme pointer sur le canal de broadcast. Prochaine étape : M4.
 - **2026-06-21** — Canal de broadcast « XYZ Deployer Alerts » créé + bot admin, envoi validé. Messages publics passés en **anglais** (audience internationale). 38 tests.
 - **2026-06-21** — M4 (code) : `run_loop` durci (backoff exponentiel plafonné, heartbeat, arrêt propre SIGTERM), `run_cycle` factorisé + testé, unit systemd (`deploy/xyz-bot.service`) + runbook (`deploy/DEPLOY.md`). 43 tests verts, arrêt propre SIGTERM validé en live. Reste : déployer sur la VM Hostinger (Ubuntu, en provisioning).
+- **2026-06-21** — M4 **déployé en prod** : VPS Hostinger Ubuntu 24.04 (`217.65.145.163`), Postgres 16 locale, service systemd `xyz-bot` actif + enabled (boot), envoi réel Telegram. **Le bot tourne 24/7.** Persistance validée sur le VPS (pas de re-seed au restart). M1→M4 terminés.
