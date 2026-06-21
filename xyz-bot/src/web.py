@@ -16,6 +16,11 @@ from aiohttp import web
 
 from .config import config
 from .db import Database
+from .events import OI_CAP_CHANGE, TOTAL_OI_CAP_CHANGE
+from .util import format_amount
+
+# Event types whose old/new values are notionals → render with thousands separators.
+_AMOUNT_EVENTS = {OI_CAP_CHANGE, TOTAL_OI_CAP_CHANGE}
 
 # Short cache of DB reads: amortizes queries if the public page is hit frequently
 # (the last-cycle age is still recomputed on each request, so it stays fresh).
@@ -62,8 +67,7 @@ def render_html(payload: dict) -> str:
         f"<tr><td class='t'>{html.escape(e['at'] or '')}</td>"
         f"<td><span class='tag'>{html.escape(e['type'] or '')}</span></td>"
         f"<td>{html.escape(e['coin'] or '—')}</td>"
-        f"<td>{html.escape(str(e['old']) if e['old'] is not None else '—')} "
-        f"→ {html.escape(str(e['new']) if e['new'] is not None else '—')}</td></tr>"
+        f"<td>{_change_cell(e)}</td></tr>"
         for e in payload["recent_events"]
     ) or "<tr><td colspan='4' class='muted'>No alerts yet.</td></tr>"
 
@@ -110,6 +114,14 @@ def render_html(payload: dict) -> str:
   <footer>Live config changes on the <b>{html.escape(payload['dex'] or '')}</b> dex (Hyperliquid HIP-3).
   Auto-refresh 30s · <a href="/status.json">JSON</a></footer>
 </div></body></html>"""
+
+
+def _change_cell(e: dict) -> str:
+    """Render the "old → new" cell, formatting notionals for OI-cap events."""
+    fmt = format_amount if e["type"] in _AMOUNT_EVENTS else str
+    old = fmt(e["old"]) if e["old"] is not None else "—"
+    new = fmt(e["new"]) if e["new"] is not None else "—"
+    return f"{html.escape(old)} → {html.escape(new)}"
 
 
 def _iso(dt) -> str | None:

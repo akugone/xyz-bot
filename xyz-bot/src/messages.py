@@ -5,8 +5,6 @@ Testable in isolation; consumed by `src/telegram.py`.
 """
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
-
 from .events import (
     DELISTED,
     GROWTH_MODE_CHANGE,
@@ -19,6 +17,7 @@ from .events import (
     UNHALT,
     Event,
 )
+from .util import format_amount as _amount
 
 
 def format_event(ev: Event) -> str:
@@ -55,19 +54,6 @@ def format_event(ev: Event) -> str:
 
     # generic fallback (shouldn't happen if all types are handled)
     return f"ℹ️ {t} — {coin}: {ev.old_value} → {ev.new_value}"
-
-
-def _amount(v: str | None) -> str:
-    """Format a notional: "5000000.0" → "5,000,000". Returns the raw value if non-numeric."""
-    if v is None:
-        return "?"
-    try:
-        d = Decimal(v)
-    except (InvalidOperation, ValueError):
-        return v
-    if d == d.to_integral_value():
-        return f"{int(d):,}"
-    return f"{d:,}"
 
 
 def _new_market_detail(v: str | None) -> str:

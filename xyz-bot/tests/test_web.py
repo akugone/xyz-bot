@@ -72,6 +72,21 @@ def test_render_html_escapes_values():
     assert "&lt;script&gt;" in html
 
 
+def test_render_html_formats_oi_cap_amounts():
+    """OI-cap events render notionals with thousands separators (like Telegram)."""
+    ev = _event(NOW, etype="oi_cap_change", old="1000000.0", new="50000000.0")
+    html = render_html(status_payload(_status(NOW), [ev], NOW))
+    assert "1,000,000 → 50,000,000" in html
+    assert "1000000.0" not in html        # raw value not shown
+
+
+def test_render_html_leaves_non_amount_events_raw():
+    """Non-OI events (e.g. margin mode) are not number-formatted."""
+    ev = _event(NOW, etype="margin_mode_change", old="noCross", new="normal")
+    html = render_html(status_payload(_status(NOW), [ev], NOW))
+    assert "noCross → normal" in html
+
+
 # --- read cache (_read_cached / _build_payload) ---
 
 class _FakeDB:
