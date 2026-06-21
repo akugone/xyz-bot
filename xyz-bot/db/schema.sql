@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,
   dex         TEXT NOT NULL,
   coin        TEXT,
-  event_type  TEXT NOT NULL,     -- oi_cap_change | margin_mode_change | leverage_change | new_market | halt | ...
+  event_type  TEXT NOT NULL,     -- oi_cap_change | margin_mode_change | leverage_change | new_market | growth_mode_change | halt | ...
   old_value   TEXT,
   new_value   TEXT,
   dedup_key   TEXT UNIQUE,       -- e.g. sha256(dex|coin|event_type|new_value) ; INSERT ON CONFLICT DO NOTHING

@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 
 from .events import (
     DELISTED,
+    GROWTH_MODE_CHANGE,
     HALT,
     LEVERAGE_CHANGE,
     MARGIN_MODE_CHANGE,
@@ -36,6 +37,9 @@ def format_event(ev: Event) -> str:
 
     if t == LEVERAGE_CHANGE:
         return f"📈 Max leverage — {coin}\n{ev.old_value}x → {ev.new_value}x"
+
+    if t == GROWTH_MODE_CHANGE:
+        return f"🌱 Growth mode — {coin}\n{ev.old_value} → {ev.new_value}"
 
     if t == NEW_MARKET:
         return f"🆕 New market listed — {coin}\n{_new_market_detail(ev.new_value)}"

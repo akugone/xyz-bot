@@ -56,7 +56,7 @@ Closed list of actions the deployer can sign. The "Tracker" column = default MVP
 | `haltTrading` | `{coin, isHalted}` — halt/resume a market | ✅ |
 | `setFundingMultipliers` | `Array<[coin, mult]>` (0–10) | ⚙️ optional |
 | `setFundingInterestRates` | `Array<[coin, rate]>` (−0.01..0.01) | ⚙️ optional |
-| `setGrowthModes` | `Array<[coin, bool]>` (max 1×/30d) | ⚙️ optional |
+| `setGrowthModes` | `Array<[coin, bool]>` (max 1×/30d) | ✅ implemented (`meta.universe[].growthMode`) |
 | `setFeeScale` | fee scale (max 1×/30d) | ❌ |
 | `setFeeRecipient` | fee recipient address | ❌ |
 | `setSubDeployers` | delegate action permissions to other addresses | ❌ (except governance) |

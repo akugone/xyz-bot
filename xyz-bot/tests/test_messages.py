@@ -1,6 +1,7 @@
 """Event → Telegram message formatting tests (pure, no network)."""
 from src.events import (
     DELISTED,
+    GROWTH_MODE_CHANGE,
     HALT,
     LEVERAGE_CHANGE,
     MARGIN_MODE_CHANGE,
@@ -49,6 +50,12 @@ def test_new_market_detail_unpacked():
     msg = format_event(ev)
     assert "New market listed — xyz:META" in msg
     assert "leverage 10x · strictIsolated · OI cap 2,000,000" in msg
+
+
+def test_growth_mode():
+    msg = format_event(Event("xyz", "xyz:HOOD", GROWTH_MODE_CHANGE, "enabled", "disabled"))
+    assert "Growth mode — xyz:HOOD" in msg
+    assert "enabled → disabled" in msg
 
 
 def test_halt_and_unhalt():

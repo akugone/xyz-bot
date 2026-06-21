@@ -25,6 +25,7 @@ OI_CAP_CHANGE = "oi_cap_change"
 TOTAL_OI_CAP_CHANGE = "total_oi_cap_change"
 MARGIN_MODE_CHANGE = "margin_mode_change"
 LEVERAGE_CHANGE = "leverage_change"
+GROWTH_MODE_CHANGE = "growth_mode_change"
 HALT = "halt"
 UNHALT = "unhalt"
 DELISTED = "delisted"
@@ -86,6 +87,12 @@ def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
             events.append(Event(dex, coin, LEVERAGE_CHANGE,
                                 none_or_str(p.max_leverage), none_or_str(c.max_leverage)))
 
+        # growth mode toggled (only on a real True↔False flip; ignore None/absent edges)
+        if p.growth_mode is not None and c.growth_mode is not None \
+                and p.growth_mode != c.growth_mode:
+            events.append(Event(dex, coin, GROWTH_MODE_CHANGE,
+                                _growth_label(p.growth_mode), _growth_label(c.growth_mode)))
+
         # halt / resume — API mechanism to confirm (see HANDOVER.md).
         # Implemented provisionally by treating is_halted absent/None = not halted.
         if _halted(p) != _halted(c):
@@ -101,3 +108,7 @@ def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
 
 def _halt_label(c: CoinState) -> str:
     return "halted" if _halted(c) else "active"
+
+
+def _growth_label(v: bool) -> str:
+    return "enabled" if v else "disabled"

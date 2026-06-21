@@ -9,6 +9,7 @@ import pytest
 
 from src.events import (
     DELISTED,
+    GROWTH_MODE_CHANGE,
     HALT,
     LEVERAGE_CHANGE,
     MARGIN_MODE_CHANGE,
@@ -121,6 +122,25 @@ def test_delisting():
     curr.coins["xyz:HOOD"].is_listed = False
     events = diff(prev, curr)
     assert [e.event_type for e in events] == [DELISTED]
+
+
+def test_growth_mode_toggle():
+    prev = base_snapshot()
+    prev.coins["xyz:HOOD"].growth_mode = True
+    curr = copy.deepcopy(prev)
+    curr.coins["xyz:HOOD"].growth_mode = False
+    events = diff(prev, curr)
+    assert len(events) == 1
+    assert (events[0].event_type, events[0].old_value, events[0].new_value) == (
+        GROWTH_MODE_CHANGE, "enabled", "disabled")
+
+
+def test_growth_mode_none_edges_no_event():
+    """A None/absent growth_mode edge must not fire (avoids noise)."""
+    prev = base_snapshot()                      # growth_mode defaults to None
+    curr = copy.deepcopy(prev)
+    curr.coins["xyz:HOOD"].growth_mode = True   # None → True must NOT emit
+    assert not any(e.event_type == GROWTH_MODE_CHANGE for e in diff(prev, curr))
 
 
 def test_multiple_changes_one_coin():
