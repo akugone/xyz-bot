@@ -13,7 +13,7 @@
 | M0 — Cadrage | ✅ | events / audience / REST / sub-deployers tranchés avec fb |
 | **M1 — Lecture** | ✅ | client info API + snapshot (93 coins) + 8 tests verts |
 | **M2 — Diff & persistance** | ✅ | moteur de diff + persistance Postgres (asyncpg). Baseline survit au redémarrage (seed seulement si base vide). 25 tests verts, validé en live |
-| **M3 — Notifications** | ✅ (dry-run) | templates + envoi Telegram. Dry-run validé. Reste : brancher le vrai bot (token + chat_id) |
+| **M3 — Notifications** | ✅ | templates + envoi Telegram, **envoi réel validé** (@tradexyz_alerts_bot). Cible = chat de test ; reste à pointer sur le canal de broadcast |
 | M4 — Daemon & déploiement | ⬜ | systemd + VPS **Hostinger** |
 | M5 — Durcissement | ⬜ | rate limits, reconnections, alerte API down |
 
@@ -52,3 +52,4 @@
 - **2026-06-21** — M2 (diff) : moteur de diff `src/events.py` (events typés + `dedup_key`), seed silencieux au 1er run, boucle daemon en mémoire. 12 tests de diff verts (20 au total), validé en live. Persistance Postgres = prochaine étape.
 - **2026-06-21** — M2 (persistance) : `src/db.py` (asyncpg) — load/save snapshot + insertion idempotente des events. `run_loop` charge la baseline depuis Postgres. 5 tests d'intégration (25 au total). Validé en live : RUN 1 = seed (93 coins), RUN 2 = pas de seed (baseline rechargée). **M2 terminé.** Prochaine étape : M3 (Telegram).
 - **2026-06-21** — M3 (dry-run) : `src/messages.py` (templates) + `src/telegram.py` (envoi + dry-run) + câblage `run_loop` (envoi puis `mark_notified`). 13 tests (38 au total). Démo live dry-run OK (messages formatés conformes SPEC §7). Reste : token BotFather + chat_id pour l'envoi réel. Prochaine étape : M4 (daemon/systemd/déploiement Hostinger).
+- **2026-06-21** — M3 **terminé** : bot `@tradexyz_alerts_bot` créé, token + chat_id configurés (`.env` local non commité), envoi réel validé (2 messages reçus). Cible actuelle = chat privé de test ; à terme pointer sur le canal de broadcast. Prochaine étape : M4.
