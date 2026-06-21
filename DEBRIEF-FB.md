@@ -13,7 +13,7 @@
 | M0 — Cadrage | ✅ | events / audience / REST / sub-deployers tranchés avec fb |
 | **M1 — Lecture** | ✅ | client info API + snapshot (93 coins) + 8 tests verts |
 | **M2 — Diff & persistance** | ✅ | moteur de diff + persistance Postgres (asyncpg). Baseline survit au redémarrage (seed seulement si base vide). 25 tests verts, validé en live |
-| **M3 — Notifications** | ✅ | templates + envoi Telegram, **envoi réel validé** (@tradexyz_alerts_bot). Cible = chat de test ; reste à pointer sur le canal de broadcast |
+| **M3 — Notifications** | ✅ | templates + envoi Telegram, **envoi réel validé** sur le canal de broadcast « XYZ Deployer Alerts » (@tradexyz_alerts_bot, bot admin) |
 | M4 — Daemon & déploiement | ⬜ | systemd + VPS **Hostinger** |
 | M5 — Durcissement | ⬜ | rate limits, reconnections, alerte API down |
 
@@ -39,7 +39,7 @@
 
 - [ ] **Halts / reprises : on ne sait pas encore les détecter.** Aucun champ de halt dans `meta` ni `metaAndAssetCtxs` ; seul `isDelisted` existe (delisting permanent ≠ halt temporaire). Hypothèse : `isHalted` n'apparaît que quand un marché est halté. → fb confirme-t-il le mécanisme, ou on attend d'observer un vrai halt ? **(seul vrai inconnu côté données)**
 - [ ] **Postgres** : qui la fournit / l'héberge (Hostinger avec le reste, ou autre) ?
-- [ ] **Canal Telegram cible** : lequel exactement (public ? lequel ?). Côté code, prêt — il manque juste le token du bot + le chat_id du canal.
+- [x] **Canal Telegram cible** : canal de broadcast « XYZ Deployer Alerts » créé (privé pour l'instant, passable en public en 1 clic). Bot @tradexyz_alerts_bot admin. À confirmer avec fb : est-ce LE canal final, ou faut-il pointer ailleurs (canal public communautaire, etc.) ?
 - [ ] **Un message par event, ou groupé** quand une action touche plusieurs coins ? (actuellement : un message par event).
 - [ ] **Latence visée** + **rate limits** connus de l'info API (pour calibrer l'intervalle de poll, cible 2–5 s).
 - [ ] **Cross en live** : un marché peut-il réellement passer en `normal` (cross) après listing, ou est-ce figé ? (on saura le détecter de toute façon via le diff, mais bon à savoir).
