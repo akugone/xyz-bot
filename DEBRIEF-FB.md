@@ -12,7 +12,7 @@
 |---|---|---|
 | M0 — Cadrage | ✅ | events / audience / REST / sub-deployers tranchés avec fb |
 | **M1 — Lecture** | ✅ | client info API + snapshot (93 coins) + 8 tests verts |
-| **M2 — Diff** | ✅ (diff) · ⏳ (persistance) | moteur de diff + 12 tests verts, validé en live (seed OK). Branchement Postgres = étape suivante |
+| **M2 — Diff & persistance** | ✅ | moteur de diff + persistance Postgres (asyncpg). Baseline survit au redémarrage (seed seulement si base vide). 25 tests verts, validé en live |
 | M3 — Notifications | ⬜ | Telegram broadcast + templates + dedup |
 | M4 — Daemon & déploiement | ⬜ | systemd + VPS **Hostinger** |
 | M5 — Durcissement | ⬜ | rate limits, reconnections, alerte API down |
@@ -49,3 +49,4 @@
 
 - **2026-06-21** — M1 terminé : env + lecture API réelle (93 coins) + normalisation `marginMode` + 8 tests verts. Décisions Hostinger & broadcast actées. Limite halts identifiée et consignée.
 - **2026-06-21** — M2 (diff) : moteur de diff `src/events.py` (events typés + `dedup_key`), seed silencieux au 1er run, boucle daemon en mémoire. 12 tests de diff verts (20 au total), validé en live. Persistance Postgres = prochaine étape.
+- **2026-06-21** — M2 (persistance) : `src/db.py` (asyncpg) — load/save snapshot + insertion idempotente des events. `run_loop` charge la baseline depuis Postgres. 5 tests d'intégration (25 au total). Validé en live : RUN 1 = seed (93 coins), RUN 2 = pas de seed (baseline rechargée). **M2 terminé.** Prochaine étape : M3 (Telegram).

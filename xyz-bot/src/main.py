@@ -12,6 +12,7 @@ import asyncio
 import logging
 
 from .config import config
+from .db import Database
 from .events import diff
 from .hl_client import HyperliquidClient
 from .snapshot import Snapshot, build_snapshot
@@ -45,35 +46,54 @@ async def run_once() -> None:
 
 
 async def run_loop() -> None:
-    """Boucle daemon (M2 : diff en mémoire ; M3/M2-bis : notif + persistance Postgres).
+    """Boucle daemon : fetch → diff → persiste. Notif Telegram = M3 (encore en logs).
 
-    État actuel : le snapshot précédent est gardé EN MÉMOIRE (pas encore Postgres).
-    Au 1er cycle `prev is None` → seed silencieux (aucun event). Les events apparaissent
-    dès le 2e cycle. TODO M2-bis/M3 :
-      - charger/persister le snapshot depuis Postgres (au lieu de la mémoire)
-      - pour chaque event : ping Telegram (dedup_key anti-doublon)
+    Persistance : si `PG_DSN` est défini, le snapshot précédent vient de Postgres
+    (survit aux redémarrages) et les events inédits sont journalisés via `dedup_key`.
+    Sinon, fallback EN MÉMOIRE (utile pour un run sans base). Dans les deux cas, au tout
+    premier run sans baseline `prev is None` → seed silencieux.
     """
     client = HyperliquidClient()
-    prev: Snapshot | None = None
+    db = Database(config.pg_dsn) if config.pg_dsn else None
+    prev_mem: Snapshot | None = None  # fallback mémoire si pas de DB
+
+    if db is not None:
+        await db.connect()
+        await db.init_schema()
+        log.info("persistance Postgres active")
+    else:
+        log.warning("PG_DSN absent — persistance désactivée (état en mémoire, perdu au redémarrage)")
+
     try:
         while True:
             try:
                 snap = await fetch_snapshot(client, config.dex_name)
+                prev = await db.load_snapshot(snap.dex) if db is not None else prev_mem
                 events = diff(prev, snap)
+
                 if prev is None:
-                    log.info("seed — baseline de %d coins mémorisée (aucune alerte)", len(snap.coins))
-                elif events:
-                    for ev in events:
-                        log.info("EVENT %-20s %-14s %s → %s",
-                                 ev.event_type, ev.coin or "(dex)", ev.old_value, ev.new_value)
+                    log.info("seed — baseline de %d coins enregistrée (aucune alerte)", len(snap.coins))
                 else:
-                    log.info("cycle ok — %d coins, aucun changement", len(snap.coins))
-                prev = snap  # TODO M2-bis : remplacer par save_snapshot(snap) en Postgres
+                    new_events = await db.record_new_events(events) if db is not None else events
+                    if new_events:
+                        for ev in new_events:
+                            # M3 : c'est ici qu'on enverra le message Telegram.
+                            log.info("EVENT %-20s %-14s %s → %s",
+                                     ev.event_type, ev.coin or "(dex)", ev.old_value, ev.new_value)
+                    else:
+                        log.info("cycle ok — %d coins, aucun changement", len(snap.coins))
+
+                if db is not None:
+                    await db.save_snapshot(snap)
+                else:
+                    prev_mem = snap
             except Exception:  # noqa: BLE001 — résilience daemon
                 log.exception("cycle en erreur, on continue")
             await asyncio.sleep(config.poll_interval_sec)
     finally:
         await client.aclose()
+        if db is not None:
+            await db.close()
 
 
 if __name__ == "__main__":

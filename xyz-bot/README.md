@@ -34,10 +34,20 @@ xyz-bot/
 ```
 
 ## État
-M0 (cadrage) ✅ · **M1 (lecture) ✅** — client info API + snapshot (93 coins) + tests. Prochaine étape : **M2** (persistance Postgres + moteur de diff). Voir milestones dans `CLAUDE.md`.
+M0 ✅ · **M1 (lecture) ✅** · **M2 (diff + persistance Postgres) ✅** — 25 tests verts, validé en live (baseline survit au redémarrage). Prochaine étape : **M3** (notifications Telegram). Voir milestones dans `CLAUDE.md`.
 
 ## Tests
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest tests/ -v
+```
+Les tests de persistance (`test_db.py`) ciblent une Postgres de test ; ils sont **skippés** si elle est indisponible. DSN via `TEST_PG_DSN` (défaut : `postgresql://<user>@localhost:5432/xyzbot_test`).
+
+## Postgres en local (dev)
+```bash
+brew services start postgresql@15      # ou docker
+createdb xyzbot                        # base de dev
+createdb xyzbot_test                   # base de test
+export PG_DSN="postgresql://<user>@localhost:5432/xyzbot"
+python -m src.main                     # run_loop : fetch + diff + persistance
 ```

@@ -61,7 +61,8 @@ Tourne en daemon sous **systemd** (`Restart=always`) sur une micro VM AWS (fourn
   - **Découverte M1 — marginMode** : le champ `marginMode` n'est présent dans `meta.universe[]` que pour les marchés isolés (`strictIsolated`/`noCross`, avec `onlyIsolated:true`). Pour un marché cross (`normal`), il est **absent**. → on normalise `absent → "normal"` dans `snapshot._margin_mode()` pour que le diff capte la transition vers cross.
   - **Découverte M1 — halt** : aucun champ de halt explicite dans `meta` ni `metaAndAssetCtxs`. Seul `isDelisted` existe (delisting permanent ≠ halt temporaire). Le flag `isHalted` n'apparaît probablement que quand un marché est halté (lecture défensive déjà en place). **À confirmer sur un vrai halt avant M2.**
 - **M2 Diff** : ✅ moteur de diff `src/events.py` (events typés + `dedup_key` + seed silencieux), boucle daemon en mémoire (`run_loop`), 12 tests verts, validé en live. **Persistance Postgres : à brancher** (étape suivante — remplacer le `prev` en mémoire de `run_loop` par load/save snapshot en base).
-- **M2-bis Persistance** : brancher `db/schema.sql` (asyncpg) — load/save snapshot + `INSERT events ON CONFLICT (dedup_key) DO NOTHING`. ← prochaine étape
+- **M2-bis Persistance** : ✅ `src/db.py` (asyncpg) — load/save snapshot + `record_new_events` (`ON CONFLICT (dedup_key) DO NOTHING`, renvoie les inédits). `run_loop` charge la baseline depuis Postgres (seed seulement si base vide), persiste à chaque cycle. Fallback mémoire si `PG_DSN` absent. 5 tests d'intégration (25 au total), validé en live (baseline survit au redémarrage).
+- **M3 Notifications** : Telegram Bot API + templates + envoi des events inédits. ← prochaine étape
 - **M2 Persistance & diff** : schéma + normalisation + moteur de diff.
 - **M3 Notifications** : Telegram Bot API + templates + dedup.
 - **M4 Daemon & déploiement** : boucle async + systemd + SSH.
