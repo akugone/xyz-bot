@@ -62,7 +62,8 @@ Tourne en daemon sous **systemd** (`Restart=always`) sur une micro VM AWS (fourn
   - **Découverte M1 — halt** : aucun champ de halt explicite dans `meta` ni `metaAndAssetCtxs`. Seul `isDelisted` existe (delisting permanent ≠ halt temporaire). Le flag `isHalted` n'apparaît probablement que quand un marché est halté (lecture défensive déjà en place). **À confirmer sur un vrai halt avant M2.**
 - **M2 Diff** : ✅ moteur de diff `src/events.py` (events typés + `dedup_key` + seed silencieux), boucle daemon en mémoire (`run_loop`), 12 tests verts, validé en live. **Persistance Postgres : à brancher** (étape suivante — remplacer le `prev` en mémoire de `run_loop` par load/save snapshot en base).
 - **M2-bis Persistance** : ✅ `src/db.py` (asyncpg) — load/save snapshot + `record_new_events` (`ON CONFLICT (dedup_key) DO NOTHING`, renvoie les inédits). `run_loop` charge la baseline depuis Postgres (seed seulement si base vide), persiste à chaque cycle. Fallback mémoire si `PG_DSN` absent. 5 tests d'intégration (25 au total), validé en live (baseline survit au redémarrage).
-- **M3 Notifications** : Telegram Bot API + templates + envoi des events inédits. ← prochaine étape
+- **M3 Notifications** : ✅ `src/messages.py` (templates SPEC §7) + `src/telegram.py` (`TelegramNotifier`, dry-run intégré). `run_loop` envoie chaque event inédit puis `mark_notified`. 13 tests (38 au total). **Dry-run validé en live** (messages formatés OK). Reste : brancher le vrai bot (token + chat_id de Martin via BotFather) et passer `TELEGRAM_DRY_RUN=false`.
+- **M4 Daemon & déploiement** : backoff erreurs API + heartbeat + unit systemd + déploiement VPS Hostinger. ← prochaine étape
 - **M2 Persistance & diff** : schéma + normalisation + moteur de diff.
 - **M3 Notifications** : Telegram Bot API + templates + dedup.
 - **M4 Daemon & déploiement** : boucle async + systemd + SSH.

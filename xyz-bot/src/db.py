@@ -124,6 +124,19 @@ class Database:
                     inserted.append(ev)
         return inserted
 
+    async def mark_notified(self, dedup_keys: list[str]) -> None:
+        """Marque `notified_at = now()` pour les events effectivement envoyés.
+
+        Un event inséré mais jamais marqué (notified_at NULL) = enregistré mais non
+        délivré (ex. échec d'envoi) → traçable par une requête.
+        """
+        if not dedup_keys:
+            return
+        await self.pool.execute(
+            "UPDATE events SET notified_at = now() WHERE dedup_key = ANY($1::text[])",
+            dedup_keys,
+        )
+
 
 def _to_num(v: str | None) -> Decimal | None:
     return None if v is None else Decimal(v)

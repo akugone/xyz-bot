@@ -15,7 +15,9 @@ from .config import config
 from .db import Database
 from .events import diff
 from .hl_client import HyperliquidClient
+from .messages import format_event
 from .snapshot import Snapshot, build_snapshot
+from .telegram import TelegramNotifier
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("xyz-bot")
@@ -55,6 +57,9 @@ async def run_loop() -> None:
     """
     client = HyperliquidClient()
     db = Database(config.pg_dsn) if config.pg_dsn else None
+    notifier = TelegramNotifier(
+        config.telegram_bot_token, config.telegram_chat_id, dry_run=config.telegram_dry_run
+    )
     prev_mem: Snapshot | None = None  # fallback mémoire si pas de DB
 
     if db is not None:
@@ -63,6 +68,7 @@ async def run_loop() -> None:
         log.info("persistance Postgres active")
     else:
         log.warning("PG_DSN absent — persistance désactivée (état en mémoire, perdu au redémarrage)")
+    log.info("notifications Telegram : %s", "DRY-RUN (logs)" if notifier.dry_run else "envoi réel")
 
     try:
         while True:
@@ -75,12 +81,13 @@ async def run_loop() -> None:
                     log.info("seed — baseline de %d coins enregistrée (aucune alerte)", len(snap.coins))
                 else:
                     new_events = await db.record_new_events(events) if db is not None else events
-                    if new_events:
-                        for ev in new_events:
-                            # M3 : c'est ici qu'on enverra le message Telegram.
-                            log.info("EVENT %-20s %-14s %s → %s",
-                                     ev.event_type, ev.coin or "(dex)", ev.old_value, ev.new_value)
-                    else:
+                    sent = []
+                    for ev in new_events:
+                        await notifier.send(format_event(ev))
+                        sent.append(ev.dedup_key)
+                    if db is not None and sent:
+                        await db.mark_notified(sent)
+                    if not new_events:
                         log.info("cycle ok — %d coins, aucun changement", len(snap.coins))
 
                 if db is not None:
@@ -92,6 +99,7 @@ async def run_loop() -> None:
             await asyncio.sleep(config.poll_interval_sec)
     finally:
         await client.aclose()
+        await notifier.aclose()
         if db is not None:
             await db.close()
 
