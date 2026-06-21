@@ -1,0 +1,16 @@
+[Unit]
+Description=xyz deployer alert bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Adapter les chemins au déploiement réel sur la VM
+WorkingDirectory=/opt/xyz-bot
+ExecStart=/opt/xyz-bot/.venv/bin/python -m src.main
+EnvironmentFile=/opt/xyz-bot/.env
+Restart=always
+RestartSec=5
+User=xyzbot
+
+[Install]
+WantedBy=multi-user.target
