@@ -9,12 +9,18 @@ Les fonctions `status_payload` et `render_html` sont **pures** (pas de DB/HTTP) 
 from __future__ import annotations
 
 import html
+import time
 from datetime import datetime, timezone
 
 from aiohttp import web
 
 from .config import config
 from .db import Database
+
+# Cache court des lectures DB : amortit les requêtes si la page publique est sollicitée
+# fréquemment (l'âge du dernier cycle reste recalculé à chaque requête, donc toujours frais).
+_CACHE_TTL_SEC = 3.0
+
 
 # Au-delà de ce délai sans cycle, on considère le bot « down » (fraîcheur du heartbeat).
 def _stale_after() -> float:
@@ -113,25 +119,39 @@ def _iso(dt) -> str | None:
 # --- app aiohttp ---
 
 async def _handle_index(request: web.Request) -> web.Response:
-    payload = await _build_payload(request.app["db"])
+    payload = await _build_payload(request.app)
     return web.Response(text=render_html(payload), content_type="text/html")
 
 
 async def _handle_json(request: web.Request) -> web.Response:
-    return web.json_response(await _build_payload(request.app["db"]))
+    return web.json_response(await _build_payload(request.app))
 
 
-async def _build_payload(db: Database) -> dict:
-    status = await db.get_status(config.dex_name)
-    events = await db.recent_events(config.dex_name, 20)
+async def _build_payload(app: web.Application) -> dict:
+    status, events = await _read_cached(app)
     return status_payload(status, events, datetime.now(timezone.utc))
 
 
+async def _read_cached(app: web.Application):
+    """Lit (status, events) depuis la DB, avec un cache TTL pour limiter la charge."""
+    cache = app["cache"]
+    now = time.monotonic()
+    if cache["rows"] is None or now - cache["at"] > _CACHE_TTL_SEC:
+        db: Database = app["db"]
+        cache["rows"] = (
+            await db.get_status(config.dex_name),
+            await db.recent_events(config.dex_name, 20),
+        )
+        cache["at"] = now
+    return cache["rows"]
+
+
 async def _on_startup(app: web.Application) -> None:
-    db = Database(config.pg_dsn)
+    # Rôle read-only dédié si fourni (moindre privilège) ; sinon le DSN principal.
+    db = Database(config.web_pg_dsn or config.pg_dsn)
     await db.connect()
-    await db.init_schema()  # idempotent : garantit que bot_status existe
     app["db"] = db
+    app["cache"] = {"at": 0.0, "rows": None}
 
 
 async def _on_cleanup(app: web.Application) -> None:

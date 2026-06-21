@@ -14,12 +14,15 @@ manipule en `str` côté snapshot, donc on convertit via `Decimal` à l'aller et
 """
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
 import asyncpg
 
+from .events import Event
 from .snapshot import CoinState, Snapshot
+from .util import none_or_str
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
 
@@ -62,17 +65,17 @@ class Database:
         dex_row = await self.pool.fetchrow(
             "SELECT total_oi_cap FROM dex_state WHERE dex = $1", dex
         )
-        snap = Snapshot(dex=dex, total_oi_cap=_num_to_str(dex_row["total_oi_cap"]) if dex_row else None)
+        snap = Snapshot(dex=dex, total_oi_cap=none_or_str(dex_row["total_oi_cap"]) if dex_row else None)
         for r in rows:
             snap.coins[r["coin"]] = CoinState(
                 coin=r["coin"],
                 max_leverage=r["max_leverage"],
                 margin_mode=r["margin_mode"],
                 margin_table_id=r["margin_table_id"],
-                oi_cap=_num_to_str(r["oi_cap"]),
+                oi_cap=none_or_str(r["oi_cap"]),
                 is_listed=r["is_listed"],
                 is_halted=r["is_halted"],
-                funding_mult=_num_to_str(r["funding_mult"]),
+                funding_mult=none_or_str(r["funding_mult"]),
                 growth_mode=r["growth_mode"],
             )
         return snap
@@ -105,13 +108,9 @@ class Database:
 
     # --- events ---
 
-    async def record_new_events(self, events: list) -> list:
-        """Insère les events ; renvoie ceux RÉELLEMENT insérés (dedup_key inédit).
-
-        `events` : liste d'`Event` (src.events). On garde le type souple pour éviter
-        un import circulaire ; on lit juste leurs attributs.
-        """
-        inserted = []
+    async def record_new_events(self, events: list[Event]) -> list[Event]:
+        """Insère les events ; renvoie ceux RÉELLEMENT insérés (dedup_key inédit)."""
+        inserted: list[Event] = []
         async with self.pool.acquire() as conn:
             for ev in events:
                 row = await conn.fetchrow(
@@ -127,7 +126,7 @@ class Database:
     # --- heartbeat / statut (alimente la page publique) ---
 
     async def record_heartbeat(
-        self, dex: str, started_at, markets_count: int, errors: int
+        self, dex: str, started_at: datetime, markets_count: int, errors: int
     ) -> None:
         """Met à jour la ligne de statut du bot (upsert) — appelé à chaque cycle."""
         await self.pool.execute(
@@ -139,7 +138,7 @@ class Database:
             dex, started_at, markets_count, errors,
         )
 
-    async def get_status(self, dex: str):
+    async def get_status(self, dex: str) -> asyncpg.Record | None:
         """Ligne de statut courante (ou None si le bot n'a jamais tourné)."""
         return await self.pool.fetchrow(
             "SELECT dex, started_at, last_cycle_at, markets_count, consecutive_errors "
@@ -147,7 +146,7 @@ class Database:
             dex,
         )
 
-    async def recent_events(self, dex: str, limit: int = 20):
+    async def recent_events(self, dex: str, limit: int = 20) -> list[asyncpg.Record]:
         """Les `limit` derniers events détectés (les plus récents d'abord)."""
         return await self.pool.fetch(
             "SELECT created_at, event_type, coin, old_value, new_value "
@@ -171,7 +170,3 @@ class Database:
 
 def _to_num(v: str | None) -> Decimal | None:
     return None if v is None else Decimal(v)
-
-
-def _num_to_str(v: object) -> str | None:
-    return None if v is None else str(v)

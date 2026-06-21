@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .util import none_or_str
+
 
 @dataclass
 class CoinState:
@@ -18,7 +20,7 @@ class CoinState:
     margin_table_id: int | None = None
     oi_cap: str | None = None               # notional cap (coinToOiCap), string décimal
     is_listed: bool = True
-    is_halted: bool | None = None           # TODO M1: confirmer le champ API
+    is_halted: bool | None = None           # mécanisme halt à confirmer avec fb (cf. DEBRIEF-FB.md)
     funding_mult: str | None = None
     growth_mode: bool | None = None
 
@@ -32,9 +34,9 @@ class Snapshot:
 
 def build_snapshot(dex: str, meta: dict[str, Any], limits: dict[str, Any]) -> Snapshot:
     """Construit un Snapshot à partir des réponses `meta` et `perpDexLimits`."""
-    snap = Snapshot(dex=dex, total_oi_cap=_to_str(limits.get("totalOiCap")))
+    snap = Snapshot(dex=dex, total_oi_cap=none_or_str(limits.get("totalOiCap")))
 
-    oi_caps = {coin: _to_str(cap) for coin, cap in limits.get("coinToOiCap", [])}
+    oi_caps = {coin: none_or_str(cap) for coin, cap in limits.get("coinToOiCap", [])}
 
     for u in meta.get("universe", []):
         name = u["name"]
@@ -62,10 +64,6 @@ def _margin_mode(u: dict[str, Any]) -> str:
     le passage en cross (l'event que fb veut surveiller), au lieu de voir `noCross → None`.
     """
     return u.get("marginMode") or "normal"
-
-
-def _to_str(v: Any) -> str | None:
-    return None if v is None else str(v)
 
 
 def _growth(v: Any) -> bool | None:

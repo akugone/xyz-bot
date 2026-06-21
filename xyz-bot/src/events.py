@@ -17,6 +17,7 @@ import hashlib
 from dataclasses import dataclass
 
 from .snapshot import CoinState, Snapshot
+from .util import none_or_str
 
 # --- types d'events (alignés sur events.event_type en base) ---
 NEW_MARKET = "new_market"
@@ -84,7 +85,7 @@ def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
 
         if p.max_leverage != c.max_leverage:
             events.append(Event(dex, coin, LEVERAGE_CHANGE,
-                                _s(p.max_leverage), _s(c.max_leverage)))
+                                none_or_str(p.max_leverage), none_or_str(c.max_leverage)))
 
         # halt / reprise — mécanisme API à confirmer avec fb (cf. DEBRIEF-FB.md).
         # Implémenté de façon provisoire en traitant is_halted absent/None = non halté.
@@ -97,10 +98,6 @@ def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
             events.append(Event(dex, coin, DELISTED, "listed", "delisted"))
 
     return events
-
-
-def _s(v: object) -> str | None:
-    return None if v is None else str(v)
 
 
 def _halt_label(c: CoinState) -> str:

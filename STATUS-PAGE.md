@@ -62,7 +62,8 @@
 
 - **Service séparé** du bot : `xyz-bot-web` (systemd), distinct du daemon `xyz-bot`.
   Si la page tombe, le bot continue d'alerter ; si le bot redémarre, la page reste debout.
-- Il **lit en seule lecture** la base Postgres du bot (mêmes données, aucune écriture).
+- Il **lit en seule lecture** la base Postgres du bot, via un **rôle read-only dédié**
+  (`xyzbot_ro`) — il ne *peut techniquement pas* écrire. Lectures mises en cache ~3 s.
 - Le daemon écrit un **heartbeat** (table `bot_status`) à chaque cycle : dernier passage,
   nombre de marchés, erreurs. La page en déduit l'état et lit les derniers events.
 - Implémentation : `xyz-bot/src/web.py` (aiohttp). Sources publiques sur le repo GitHub privé.

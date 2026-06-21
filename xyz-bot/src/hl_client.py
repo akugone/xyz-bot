@@ -36,15 +36,8 @@ class HyperliquidClient:
         """totalOiCap, oiSzCapPerPerp, maxTransferNtl, coinToOiCap (les OI caps)."""
         return await self._post({"type": "perpDexLimits", "dex": dex})
 
-    # --- endpoints d'appoint ---
-
-    async def get_meta_and_asset_ctxs(self, dex: str) -> list[Any]:
-        """universe + contexte live : openInterest, markPx, oraclePx, funding."""
-        return await self._post({"type": "metaAndAssetCtxs", "dex": dex})
-
-    async def get_perps_at_oi_cap(self, dex: str) -> list[str]:
-        """Liste des perps actuellement collés à leur OI cap (signal pré-increase)."""
-        return await self._post({"type": "perpsAtOpenInterestCap", "dex": dex})
+    # Endpoints d'appoint non encore utilisés (metaAndAssetCtxs, perpsAtOpenInterestCap)
+    # retirés volontairement : à réintroduire si on branche le signal pré-OI-increase (M6).
 
     async def aclose(self) -> None:
         await self._client.aclose()

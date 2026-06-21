@@ -17,6 +17,8 @@ class Config:
     # M4 : intervalle du heartbeat « still alive » dans les logs (s) — 0 pour désactiver
     heartbeat_interval_sec: float = float(os.getenv("HEARTBEAT_INTERVAL_SEC", "3600"))
     pg_dsn: str | None = os.getenv("PG_DSN")
+    # DSN dédié à la page web (rôle Postgres read-only) ; défaut = pg_dsn si non fourni
+    web_pg_dsn: str | None = os.getenv("WEB_PG_DSN")
     telegram_bot_token: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
     telegram_chat_id: str | None = os.getenv("TELEGRAM_CHAT_ID")
     # dry-run : logue les messages au lieu de les envoyer (forcé aussi si token/chat absent)

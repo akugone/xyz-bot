@@ -59,15 +59,15 @@ async def run_cycle(
     client: HyperliquidClient,
     db: Database | None,
     notifier: TelegramNotifier,
-    prev_mem: Snapshot | None,
+    prev_snapshot: Snapshot | None,
 ) -> Snapshot:
     """Un cycle complet : fetch → diff → notifie les inédits → persiste. Renvoie le snapshot.
 
-    Le snapshot précédent vient de Postgres si `db`, sinon de `prev_mem` (fallback mémoire).
+    Le snapshot précédent vient de Postgres si `db`, sinon de `prev_snapshot` (fallback mémoire).
     Au 1er run sans baseline (`prev is None`) → seed silencieux (aucune alerte).
     """
     snap = await fetch_snapshot(client, config.dex_name)
-    prev = await db.load_snapshot(snap.dex) if db is not None else prev_mem
+    prev = await db.load_snapshot(snap.dex) if db is not None else prev_snapshot
     events = diff(prev, snap)
 
     if prev is None:
@@ -104,7 +104,7 @@ async def run_loop() -> None:
     notifier = TelegramNotifier(
         config.telegram_bot_token, config.telegram_chat_id, dry_run=config.telegram_dry_run
     )
-    prev_mem: Snapshot | None = None  # fallback mémoire si pas de DB
+    last_snap: Snapshot | None = None  # dernier snapshot (fallback mémoire si pas de DB)
 
     if db is not None:
         await db.connect()
@@ -131,8 +131,8 @@ async def run_loop() -> None:
     try:
         while not stop.is_set():
             try:
-                prev_mem = await run_cycle(client, db, notifier, prev_mem)
-                last_markets = len(prev_mem.coins)
+                last_snap = await run_cycle(client, db, notifier, last_snap)
+                last_markets = len(last_snap.coins)
                 errors = 0
             except Exception:  # noqa: BLE001 — résilience daemon
                 errors += 1

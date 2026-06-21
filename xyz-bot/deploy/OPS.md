@@ -137,6 +137,8 @@ uptime                            # charge / uptime
 
 ## Sécurité
 - `.env` (token + mdp DB) : **uniquement** sur le VPS, jamais commité. Permissions `600`.
+- **Page web = rôle Postgres read-only** (`xyzbot_ro`, via `WEB_PG_DSN`) : elle ne peut que lire. Le daemon garde le rôle read/write `xyzbot`.
+- Units systemd **durcies** (`NoNewPrivileges`, `ProtectSystem`, `SystemCallFilter=@system-service`…).
 - Auth SSH : par **clé uniquement** (mot de passe désactivé via `/etc/ssh/sshd_config.d/00-disable-password.conf`).
 - Mot de passe root du VPS : à régénérer depuis le dashboard Hostinger (il a transité en clair au setup).
 - Token Telegram compromis → le régénérer dans BotFather (`/revoke`), puis mettre à jour `.env` + `systemctl restart`.
