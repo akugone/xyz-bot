@@ -75,6 +75,8 @@ async def run_cycle(
         new_events = await db.record_new_events(events) if db is not None else events
         sent = []
         for ev in new_events:
+            log.info("EVENT %-20s %-14s %s → %s",
+                     ev.event_type, ev.coin or "(dex)", ev.old_value, ev.new_value)
             await notifier.send(format_event(ev))
             sent.append(ev.dedup_key)
         if db is not None and sent:
