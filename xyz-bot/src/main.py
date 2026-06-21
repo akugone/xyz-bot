@@ -10,6 +10,7 @@ import asyncio
 import logging
 import signal
 import time
+from datetime import datetime, timezone
 
 from .config import config
 from .db import Database
@@ -122,6 +123,8 @@ async def run_loop() -> None:
             pass
 
     errors = 0
+    last_markets = 0
+    started_at = datetime.now(timezone.utc)
     last_heartbeat = time.monotonic()
     log.info("démarrage de la boucle (poll=%ss)", config.poll_interval_sec)
 
@@ -129,10 +132,18 @@ async def run_loop() -> None:
         while not stop.is_set():
             try:
                 prev_mem = await run_cycle(client, db, notifier, prev_mem)
+                last_markets = len(prev_mem.coins)
                 errors = 0
             except Exception:  # noqa: BLE001 — résilience daemon
                 errors += 1
                 log.exception("cycle en erreur (%d consécutive[s]), backoff", errors)
+
+            # heartbeat en base (alimente la page de statut) — best-effort
+            if db is not None:
+                try:
+                    await db.record_heartbeat(config.dex_name, started_at, last_markets, errors)
+                except Exception:  # noqa: BLE001
+                    log.exception("heartbeat en base KO")
 
             now = time.monotonic()
             if config.heartbeat_interval_sec and now - last_heartbeat >= config.heartbeat_interval_sec:

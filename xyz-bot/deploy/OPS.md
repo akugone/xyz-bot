@@ -6,7 +6,8 @@ Aide-mémoire des commandes courantes. Le bot tourne en daemon systemd sur le VP
 |---|---|
 | **Serveur** | Ubuntu 24.04 — `217.65.145.163` |
 | **Connexion** | `ssh root@217.65.145.163` (clé SSH uniquement, mot de passe désactivé) |
-| **Service** | `xyz-bot` (systemd) — `active` + `enabled` (démarre au boot) |
+| **Services** | `xyz-bot` (daemon) + `xyz-bot-web` (page de statut) — systemd, `active` + `enabled` |
+| **Page statut** | http://217.65.145.163:8080/ (HTML) · `/status.json` (JSON) |
 | **Code** | `/opt/xyz-bot` (venv `.venv`, secrets `.env`) |
 | **Base** | Postgres 16 locale — base `xyzbot`, user `xyzbot` |
 | **Canal** | Telegram « XYZ Deployer Alerts » via `@tradexyz_alerts_bot` |
@@ -31,6 +32,17 @@ systemctl start xyz-bot           # démarrer
 systemctl stop xyz-bot            # arrêter (SIGTERM -> arrêt propre)
 systemctl restart xyz-bot         # redémarrer
 systemctl reload-or-restart xyz-bot
+```
+
+> Les commandes systemd ci-dessous s'appliquent aussi au service web en remplaçant
+> `xyz-bot` par **`xyz-bot-web`** (ex. `systemctl status xyz-bot-web`, `journalctl -u xyz-bot-web -f`).
+
+## Page de statut
+
+```bash
+curl -s http://217.65.145.163:8080/status.json   # statut machine-readable
+# Page HTML : ouvrir http://217.65.145.163:8080/ dans un navigateur
+systemctl restart xyz-bot-web                     # redémarrer la page
 ```
 
 ## Logs

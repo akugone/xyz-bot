@@ -124,6 +124,37 @@ class Database:
                     inserted.append(ev)
         return inserted
 
+    # --- heartbeat / statut (alimente la page publique) ---
+
+    async def record_heartbeat(
+        self, dex: str, started_at, markets_count: int, errors: int
+    ) -> None:
+        """Met à jour la ligne de statut du bot (upsert) — appelé à chaque cycle."""
+        await self.pool.execute(
+            "INSERT INTO bot_status (dex, started_at, last_cycle_at, markets_count, consecutive_errors) "
+            "VALUES ($1, $2, now(), $3, $4) "
+            "ON CONFLICT (dex) DO UPDATE SET "
+            "  started_at = EXCLUDED.started_at, last_cycle_at = now(), "
+            "  markets_count = EXCLUDED.markets_count, consecutive_errors = EXCLUDED.consecutive_errors",
+            dex, started_at, markets_count, errors,
+        )
+
+    async def get_status(self, dex: str):
+        """Ligne de statut courante (ou None si le bot n'a jamais tourné)."""
+        return await self.pool.fetchrow(
+            "SELECT dex, started_at, last_cycle_at, markets_count, consecutive_errors "
+            "FROM bot_status WHERE dex = $1",
+            dex,
+        )
+
+    async def recent_events(self, dex: str, limit: int = 20):
+        """Les `limit` derniers events détectés (les plus récents d'abord)."""
+        return await self.pool.fetch(
+            "SELECT created_at, event_type, coin, old_value, new_value "
+            "FROM events WHERE dex = $1 ORDER BY id DESC LIMIT $2",
+            dex, limit,
+        )
+
     async def mark_notified(self, dedup_keys: list[str]) -> None:
         """Marque `notified_at = now()` pour les events effectivement envoyés.
 

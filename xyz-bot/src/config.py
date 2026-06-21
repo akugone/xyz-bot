@@ -21,6 +21,9 @@ class Config:
     telegram_chat_id: str | None = os.getenv("TELEGRAM_CHAT_ID")
     # dry-run : logue les messages au lieu de les envoyer (forcé aussi si token/chat absent)
     telegram_dry_run: bool = os.getenv("TELEGRAM_DRY_RUN", "").lower() in ("1", "true", "yes")
+    # page de statut publique (service web séparé)
+    web_host: str = os.getenv("WEB_HOST", "0.0.0.0")
+    web_port: int = int(os.getenv("WEB_PORT", "8080"))
 
 
 config = Config()

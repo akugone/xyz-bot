@@ -1,0 +1,26 @@
+[Unit]
+Description=xyz deployer bot - page de statut publique
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xyzbot
+WorkingDirectory=/opt/xyz-bot
+EnvironmentFile=/opt/xyz-bot/.env
+ExecStart=/opt/xyz-bot/.venv/bin/python -m src.web
+
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+# Durcissement basique
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

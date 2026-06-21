@@ -24,6 +24,15 @@ CREATE TABLE IF NOT EXISTS dex_state (
   updated_at   TIMESTAMPTZ DEFAULT now()
 );
 
+-- Heartbeat / santé du bot (1 ligne par dex) : alimente la page de statut publique
+CREATE TABLE IF NOT EXISTS bot_status (
+  dex                TEXT PRIMARY KEY,
+  started_at         TIMESTAMPTZ,    -- début du process courant
+  last_cycle_at      TIMESTAMPTZ,    -- dernier cycle (sert au up/down par fraîcheur)
+  markets_count      INT,
+  consecutive_errors INT DEFAULT 0
+);
+
 -- Journal des events détectés = idempotence anti-doublon
 CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,
