@@ -3,7 +3,7 @@ import asyncio
 import copy
 
 from src.config import config
-from src.main import backoff_delay, run_cycle
+from src.main import api_alert_action, backoff_delay, run_cycle
 
 from .fixtures import META_RESPONSE, PERP_DEX_LIMITS_RESPONSE
 
@@ -22,6 +22,23 @@ def test_backoff_grows_exponentially():
 def test_backoff_is_capped():
     assert backoff_delay(50) == config.error_backoff_max_sec
     assert backoff_delay(1000) <= config.error_backoff_max_sec
+
+
+# --- alerte API down/up ---
+
+def test_api_alert_fires_down_once_at_threshold():
+    assert api_alert_action(3, 3, alerted=False) == "down"   # seuil atteint → alerter
+    assert api_alert_action(5, 3, alerted=True) is None        # déjà alerté → pas de spam
+
+
+def test_api_alert_silent_below_threshold():
+    assert api_alert_action(1, 3, alerted=False) is None
+    assert api_alert_action(2, 3, alerted=False) is None
+
+
+def test_api_alert_recovers_once():
+    assert api_alert_action(0, 3, alerted=True) == "up"        # rétabli → notifier
+    assert api_alert_action(0, 3, alerted=False) is None       # jamais tombé → rien
 
 
 # --- run_cycle (duck-typed client + notifier, pas de DB → fallback mémoire) ---

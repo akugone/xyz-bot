@@ -33,12 +33,14 @@ class TelegramNotifier:
     def dry_run(self) -> bool:
         return self._dry_run
 
-    async def send(self, text: str) -> None:
+    async def send(self, text: str, chat_id: str | None = None) -> None:
+        """Envoie `text`. `chat_id` permet de cibler un autre chat (ex. canal d'alertes ops)."""
+        target = chat_id or self._chat_id
         if self._dry_run:
-            log.info("[DRY-RUN telegram] → chat=%s\n%s", self._chat_id, text)
+            log.info("[DRY-RUN telegram] → chat=%s\n%s", target, text)
             return
         url = f"https://api.telegram.org/bot{self._token}/sendMessage"
-        resp = await self._client.post(url, json={"chat_id": self._chat_id, "text": text})
+        resp = await self._client.post(url, json={"chat_id": target, "text": text})
         resp.raise_for_status()
 
     async def aclose(self) -> None:

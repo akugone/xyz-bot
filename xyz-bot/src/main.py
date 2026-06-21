@@ -31,6 +31,19 @@ def backoff_delay(errors: int) -> float:
     return min(config.poll_interval_sec * (2 ** errors), config.error_backoff_max_sec)
 
 
+def api_alert_action(errors: int, threshold: int, alerted: bool) -> str | None:
+    """Transition de l'état API → 'down' (à alerter), 'up' (rétabli), ou None (rien).
+
+    'down' : on a atteint le seuil d'erreurs consécutives et on n'a pas encore alerté.
+    'up'   : un cycle vient de réussir (errors == 0) alors qu'on était en état alerté.
+    """
+    if errors >= threshold and not alerted:
+        return "down"
+    if errors == 0 and alerted:
+        return "up"
+    return None
+
+
 async def fetch_snapshot(client: HyperliquidClient, dex: str) -> Snapshot:
     """Récupère meta + perpDexLimits et construit un snapshot par coin."""
     meta, limits = await asyncio.gather(
@@ -90,6 +103,16 @@ async def run_cycle(
     return snap
 
 
+async def _ops_alert(notifier: TelegramNotifier, text: str) -> None:
+    """Alerte d'exploitation → chat admin si configuré, sinon seulement loggée (best-effort)."""
+    log.warning("OPS ALERT: %s", text)
+    if config.telegram_admin_chat_id:
+        try:
+            await notifier.send(text, chat_id=config.telegram_admin_chat_id)
+        except Exception:  # noqa: BLE001
+            log.exception("envoi alerte ops KO")
+
+
 async def run_loop() -> None:
     """Boucle daemon de prod : résiliente (backoff sur erreur), heartbeat, arrêt propre.
 
@@ -124,6 +147,7 @@ async def run_loop() -> None:
 
     errors = 0
     last_markets = 0
+    api_alerted = False  # a-t-on déjà prévenu que l'API est down ?
     started_at = datetime.now(timezone.utc)
     last_heartbeat = time.monotonic()
     log.info("démarrage de la boucle (poll=%ss)", config.poll_interval_sec)
@@ -137,6 +161,16 @@ async def run_loop() -> None:
             except Exception:  # noqa: BLE001 — résilience daemon
                 errors += 1
                 log.exception("cycle en erreur (%d consécutive[s]), backoff", errors)
+
+            # alerte ops « API down » / « rétablie » (sur transition, pas de spam)
+            action = api_alert_action(errors, config.api_down_threshold, api_alerted)
+            if action == "down":
+                api_alerted = True
+                await _ops_alert(notifier, f"⚠️ xyz-bot: Hyperliquid API unreachable "
+                                           f"({errors} consecutive errors). Alerts paused until recovery.")
+            elif action == "up":
+                api_alerted = False
+                await _ops_alert(notifier, "✅ xyz-bot: Hyperliquid API recovered. Monitoring resumed.")
 
             # heartbeat en base (alimente la page de statut) — best-effort
             if db is not None:

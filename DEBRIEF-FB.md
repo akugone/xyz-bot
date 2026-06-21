@@ -2,7 +2,7 @@
 
 > Document **vivant**, complété au fil des milestones. Sert de support au point avec fb.
 > Archive du cadrage initial : `questions-pour-fb.md`. Spec complète : `xyz-deployer-bot-SPEC.md`.
-> Page de statut publique : `STATUS-PAGE.md`. Exploitation : `xyz-bot/deploy/OPS.md`.
+> Page de statut publique : `STATUS-PAGE.md`. Exploitation : `xyz-bot/deploy/OPS.md`. Suite prévue : `ROADMAP.md`.
 > Dernière mise à jour : **2026-06-21**.
 
 ---

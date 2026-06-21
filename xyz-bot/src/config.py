@@ -21,6 +21,10 @@ class Config:
     web_pg_dsn: str | None = os.getenv("WEB_PG_DSN")
     telegram_bot_token: str | None = os.getenv("TELEGRAM_BOT_TOKEN")
     telegram_chat_id: str | None = os.getenv("TELEGRAM_CHAT_ID")
+    # canal d'alertes ops (API down…) — privé/admin ; si vide, ces alertes restent en logs
+    telegram_admin_chat_id: str | None = os.getenv("TELEGRAM_ADMIN_CHAT_ID")
+    # nb d'erreurs consécutives avant d'alerter « API down »
+    api_down_threshold: int = int(os.getenv("API_DOWN_THRESHOLD", "3"))
     # dry-run : logue les messages au lieu de les envoyer (forcé aussi si token/chat absent)
     telegram_dry_run: bool = os.getenv("TELEGRAM_DRY_RUN", "").lower() in ("1", "true", "yes")
     # page de statut publique (service web séparé)
