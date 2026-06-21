@@ -25,29 +25,29 @@ def format_event(ev: Event) -> str:
     t = ev.event_type
 
     if t == OI_CAP_CHANGE:
-        return f"🟢 OI cap modifié — {coin}\n{_amount(ev.old_value)} → {_amount(ev.new_value)} USDC"
+        return f"🟢 OI cap changed — {coin}\n{_amount(ev.old_value)} → {_amount(ev.new_value)} USDC"
 
     if t == TOTAL_OI_CAP_CHANGE:
-        return f"🟢 OI cap global du dex {ev.dex}\n{_amount(ev.old_value)} → {_amount(ev.new_value)} USDC"
+        return f"🟢 Dex-wide OI cap — {ev.dex}\n{_amount(ev.old_value)} → {_amount(ev.new_value)} USDC"
 
     if t == MARGIN_MODE_CHANGE:
-        extra = " (cross activé)" if ev.new_value == "normal" else ""
-        return f"⚙️ Mode de marge — {coin}\n{ev.old_value} → {ev.new_value}{extra}"
+        extra = " (cross enabled)" if ev.new_value == "normal" else ""
+        return f"⚙️ Margin mode — {coin}\n{ev.old_value} → {ev.new_value}{extra}"
 
     if t == LEVERAGE_CHANGE:
-        return f"📈 Levier max — {coin}\n{ev.old_value}x → {ev.new_value}x"
+        return f"📈 Max leverage — {coin}\n{ev.old_value}x → {ev.new_value}x"
 
     if t == NEW_MARKET:
-        return f"🆕 Nouveau marché listé — {coin}\n{_new_market_detail(ev.new_value)}"
+        return f"🆕 New market listed — {coin}\n{_new_market_detail(ev.new_value)}"
 
     if t == HALT:
-        return f"⛔ Trading halté — {coin}"
+        return f"⛔ Trading halted — {coin}"
 
     if t == UNHALT:
-        return f"✅ Trading repris — {coin}"
+        return f"✅ Trading resumed — {coin}"
 
     if t == DELISTED:
-        return f"🗑️ Marché delisté — {coin}"
+        return f"🗑️ Market delisted — {coin}"
 
     # fallback générique (ne devrait pas arriver si tous les types sont gérés)
     return f"ℹ️ {t} — {coin} : {ev.old_value} → {ev.new_value}"
@@ -72,4 +72,4 @@ def _new_market_detail(v: str | None) -> str:
     lev = parts.get("lev", "?")
     mode = parts.get("mode", "?")
     oi = _amount(parts.get("oi_cap"))
-    return f"levier {lev}x · {mode} · OI cap {oi}"
+    return f"leverage {lev}x · {mode} · OI cap {oi}"
