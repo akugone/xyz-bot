@@ -1,146 +1,170 @@
-# Spec & plan de dev — Bot d'alertes « deployer xyz » (Hyperliquid HIP-3)
+# Spec & dev plan — "xyz deployer" alert bot (Hyperliquid HIP-3)
 
-> Document autoportant. Destiné à être collé tel quel dans un prompt agent : il contient tout le contexte, les specs techniques, les endpoints, le modèle de données et le plan de dev. Aucune connaissance préalable du projet n'est requise.
-
----
-
-## 1. Contexte & objectif
-
-**Origine.** Demande de l'équipe trade.xyz (contact « fb ») : un bot Telegram qui **notifie en temps quasi-réel les changements de configuration** du DEX de perps `xyz` déployé sur Hyperliquid.
-
-**Audience cible (confirmée par fb).** Pas les market makers — ils ont déjà leur propre infra pour recevoir ces notifs. La cible est le **retail** et les **autres groupes Telegram** de la communauté (ex. groupes type « mlm »…). Un bot tiers qui **confirme avec une notif claire** a quand même de la valeur pour ce public. Positionnement : outil **public / retail-facing**, pas une alerte interne MM. Cas d'usage phare : les traders « snipent » les augmentations d'OI cap (ex. constaté sur MRVL après une annonce de partenariat NVDA).
-
-**Objectif.** Un service qui poll l'API Hyperliquid, détecte les changements d'état du dex `xyz`, et envoie un message Telegram formaté **une seule fois par changement** (pas de doublon).
-
-**Ce que le projet N'EST PAS.** Pas de lecture de smart contract EVM, pas de signature de transactions, pas d'ordre de trading. Lecture seule (`POST /info`) + notification.
+> Self-contained document. Meant to be pasted as-is into an agent prompt: it contains all the
+> context, technical specs, endpoints, data model, and dev plan. No prior knowledge required.
 
 ---
 
-## 2. Faits techniques confirmés (sourcés)
+## 1. Context & goal
 
-- L'adresse `0x88806a71D74ad0a510b350545C9aE490912F0888` est le **deployer HIP-3 du dex `xyz`** (trade.xyz), sur le **mainnet** Hyperliquid. Confirmé par la doc trade.xyz (table « HIP-3 Metadata »).
-- Oracle Updater (adresse distincte, à ignorer pour le monitoring) : `0x1234567890545d1Df9EE64B35Fdd16966e08aCEC`.
-- **Le deployer n'est pas un contrat Solidity à ABI.** Il signe des **actions L1** (`PerpDeployAction`) traitées par HyperCore. On ne lit pas des `view functions` ; on **poll l'état déployé via l'info API et on diff** entre deux snapshots pour détecter les changements.
-- Nom du dex dans l'API : `dex = "xyz"`. Les coins sont préfixés : `xyz:NVDA`, `xyz:TSLA`, `xyz:XYZ100`, etc.
-- Endpoint REST de base : `POST https://api.hyperliquid.xyz/info`, header `Content-Type: application/json`.
+**Origin.** Request from the trade.xyz team: a Telegram bot that **notifies, in near real-time,
+configuration changes** of the `xyz` perp DEX deployed on Hyperliquid.
 
-**Sources :**
-- HIP-3 deployer actions : https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/hip-3-deployer-actions
-- Perpetuals info endpoint : https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals
-- HIP-3 (overview) : https://hyperliquid.gitbook.io/hyperliquid-docs/hyperliquid-improvement-proposals-hips/hip-3-builder-deployed-perpetuals
-- trade.xyz architecture (metadata deployer/oracle) : https://docs.trade.xyz/
+**Target audience (confirmed).** Not market makers — they already have their own infra to
+receive these notifications. The target is **retail** and **other community Telegram groups**. A
+third-party bot that **confirms with a clear notification** still has value for that audience.
+Positioning: a **public / retail-facing** tool, not an internal MM alert. Flagship use case:
+traders "snipe" OI cap increases (e.g. observed on MRVL after an NVDA partnership announcement).
+
+**Goal.** A service that polls the Hyperliquid API, detects state changes of the `xyz` dex, and
+sends a formatted Telegram message **exactly once per change** (no duplicates).
+
+**What the project is NOT.** No EVM smart-contract reading, no transaction signing, no trading
+orders. Read-only (`POST /info`) + notification.
 
 ---
 
-## 3. Actions du deployer (`PerpDeployAction`) — référence
+## 2. Confirmed technical facts (sourced)
 
-Liste fermée des actions que le deployer peut signer. La colonne « Tracker » = MVP par défaut (à faire valider par fb).
+- The address `0x88806a71D74ad0a510b350545C9aE490912F0888` is the **HIP-3 deployer of the `xyz`
+  dex** (trade.xyz), on Hyperliquid **mainnet**. Confirmed by the trade.xyz docs ("HIP-3 Metadata").
+- Oracle Updater (distinct address, ignore for monitoring): `0x1234567890545d1Df9EE64B35Fdd16966e08aCEC`.
+- **The deployer is not a Solidity contract with an ABI.** It signs **L1 actions**
+  (`PerpDeployAction`) handled by HyperCore. We don't read `view functions`; we **poll the
+  deployed state via the info API and diff** between two snapshots to detect changes.
+- Dex name in the API: `dex = "xyz"`. Coins are prefixed: `xyz:NVDA`, `xyz:TSLA`, `xyz:XYZ100`, etc.
+- Base REST endpoint: `POST https://api.hyperliquid.xyz/info`, header `Content-Type: application/json`.
 
-| Action | Effet | Tracker |
+**Sources:**
+- HIP-3 deployer actions: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/hip-3-deployer-actions
+- Perpetuals info endpoint: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals
+- HIP-3 (overview): https://hyperliquid.gitbook.io/hyperliquid-docs/hyperliquid-improvement-proposals-hips/hip-3-builder-deployed-perpetuals
+- trade.xyz architecture (deployer/oracle metadata): https://docs.trade.xyz/
+
+---
+
+## 3. Deployer actions (`PerpDeployAction`) — reference
+
+Closed list of actions the deployer can sign. The "Tracker" column = default MVP (to be validated).
+
+| Action | Effect | Tracker |
 |---|---|---|
-| `registerAsset2` / `registerAsset` | Init dex / liste un nouvel actif (coin, szDecimals, oraclePx, marginTableId, marginMode) | ✅ nouveau marché |
-| `setOpenInterestCaps` | Modifie le plafond d'OI notionnel par actif | ✅ **prioritaire** (l'« OI increase ») |
-| `setMarginModes` | change le mode de marge — transitions **sens unique** : `strictIsolated → noCross → normal (cross)`, jamais l'inverse (confirmé fb) | ✅ |
-| `setMarginTableIds` | `Array<[coin, marginTableId]>` — réassigne la table de marge (→ levier max) | ✅ levier |
-| `haltTrading` | `{coin, isHalted}` — halte/reprend un marché | ✅ |
-| `setFundingMultipliers` | `Array<[coin, mult]>` (0–10) | ⚙️ optionnel |
-| `setFundingInterestRates` | `Array<[coin, rate]>` (−0.01..0.01) | ⚙️ optionnel |
-| `setGrowthModes` | `Array<[coin, bool]>` (max 1×/30j) | ⚙️ optionnel |
-| `setFeeScale` | échelle de fees (max 1×/30j) | ❌ |
-| `setFeeRecipient` | adresse réceptrice des fees | ❌ |
-| `setSubDeployers` | délègue des permissions d'action à d'autres adresses | ❌ (sauf gouvernance) |
-| `setPerpAnnotation` | métadonnées (catégorie, description, displayName, keywords) | ❌ cosmétique |
-| `setOracle` | maj prix oracle/mark (~toutes les 3s) | ❌ **bruit — exclure du diff** |
+| `registerAsset2` / `registerAsset` | Init dex / list a new asset (coin, szDecimals, oraclePx, marginTableId, marginMode) | ✅ new market |
+| `setOpenInterestCaps` | Change the notional OI cap per asset | ✅ **priority** (the "OI increase") |
+| `setMarginModes` | change margin mode — **one-way** transitions: `strictIsolated → noCross → normal (cross)`, never backwards (confirmed) | ✅ |
+| `setMarginTableIds` | `Array<[coin, marginTableId]>` — reassign the margin table (→ max leverage) | ✅ leverage |
+| `haltTrading` | `{coin, isHalted}` — halt/resume a market | ✅ |
+| `setFundingMultipliers` | `Array<[coin, mult]>` (0–10) | ⚙️ optional |
+| `setFundingInterestRates` | `Array<[coin, rate]>` (−0.01..0.01) | ⚙️ optional |
+| `setGrowthModes` | `Array<[coin, bool]>` (max 1×/30d) | ⚙️ optional |
+| `setFeeScale` | fee scale (max 1×/30d) | ❌ |
+| `setFeeRecipient` | fee recipient address | ❌ |
+| `setSubDeployers` | delegate action permissions to other addresses | ❌ (except governance) |
+| `setPerpAnnotation` | metadata (category, description, displayName, keywords) | ❌ cosmetic |
+| `setOracle` | oracle/mark price update (~every 3s) | ❌ **noise — exclude from diff** |
 
-Modes de marge : `strictIsolated` (marge isolée non retirable), `noCross` (isolé uniquement), `normal` (cross autorisé). **Transitions confirmées par fb : un marché ne va que dans le sens du desserrement — `strictIsolated → noCross → normal (cross)`, jamais en arrière.** Le bot doit donc détecter aussi le passage vers `normal` (cross), pas seulement strict↔noCross. Comme on diffe le champ d'état `marginMode` (qui prend n'importe quelle valeur), la détection est robuste quel que soit le mécanisme exact côté action. Levier max ∈ [1, 50], structuré en *margin tiers* (≤ 3 paliers, levier décroissant avec la taille de position).
+Margin modes: `strictIsolated` (non-withdrawable isolated margin), `noCross` (isolated only),
+`normal` (cross allowed). **Confirmed transitions: a market only moves in the loosening
+direction — `strictIsolated → noCross → normal (cross)`, never backwards.** The bot must also
+detect the move to `normal` (cross), not just strict↔noCross. Since we diff the `marginMode`
+state field (which can take any value), detection is robust regardless of the exact action-side
+mechanism. Max leverage ∈ [1, 50], structured in *margin tiers* (≤ 3 tiers, leverage decreasing
+with position size).
 
-**Sub-deployers (confirmé par fb) :** il existe des sub-deployers — d'autres adresses que `0x8880…0888` peuvent modifier la config du dex. Implication : **surveiller par diff d'état (et non par adresse-auteur) reste la bonne approche**, car on capte le changement quelle que soit l'adresse qui l'a signé. Pas besoin d'énumérer les sub-deployers pour le monitoring.
+**Sub-deployers (confirmed):** sub-deployers exist — addresses other than `0x8880…0888` can
+modify the dex config. Implication: **monitoring by state diff (not by signing address) remains
+the right approach**, since we capture the change regardless of which address signed it. No need
+to enumerate the sub-deployers for monitoring.
 
 ---
 
-## 4. Endpoints de lecture (info API) & mapping
+## 4. Read endpoints (info API) & mapping
 
-Tous : `POST https://api.hyperliquid.xyz/info`, body JSON, `"dex": "xyz"` pour le dex cible.
+All: `POST https://api.hyperliquid.xyz/info`, JSON body, `"dex": "xyz"` for the target dex.
 
-### Endpoints cœur (à poll)
+### Core endpoints (to poll)
 
-**`perpDexLimits`** — les plafonds, dont les OI caps (donnée n°1) :
+**`perpDexLimits`** — the limits, including OI caps (data point #1):
 ```json
-// requête
+// request
 { "type": "perpDexLimits", "dex": "xyz" }
-// réponse
+// response
 { "totalOiCap": "...", "oiSzCapPerPerp": "...", "maxTransferNtl": "...",
   "coinToOiCap": [["xyz:NVDA","..."], ["xyz:TSLA","..."]] }
 ```
 
-**`meta`** — univers des marchés + tables de marge :
+**`meta`** — market universe + margin tables:
 ```json
-// requête
+// request
 { "type": "meta", "dex": "xyz" }
-// réponse (extrait universe[])
+// response (universe[] excerpt)
 { "universe": [
     { "name":"xyz:NVDA", "szDecimals":3, "maxLeverage":10, "marginTableId":10,
       "onlyIsolated":true, "marginMode":"strictIsolated", "growthMode":"enabled",
       "lastGrowthModeChangeTime":"..." } ],
-  "marginTables": [ [10, { "description":"...", "marginTiers":[ {"lowerBound":"0.0","maxLeverage":10} ] } ] ] }
+  "marginTables": [ [10, { "description":"...", "marginTiers":[ {"lowerBound":"0.0","maxLeverage":10} ] }] ] }
 ```
 
-### Endpoints d'appoint
+### Supplementary endpoints
 
-| `type` | Donne | Usage |
+| `type` | Provides | Use |
 |---|---|---|
-| `metaAndAssetCtxs` (`dex`) | universe + ctx live : `openInterest`, `markPx`, `oraclePx`, `funding`, `dayNtlVlm` | OI réel vs cap |
-| `perpsAtOpenInterestCap` (`dex`) | liste des perps collés à leur OI cap | signal pré-« OI increase » |
-| `perpDexs` (pas de `dex`) | tous les dexs : `deployer`, `oracleUpdater`, `feeRecipient`, `assetToStreamingOiCap`, `assetToFundingMultiplier` | vérif identité + caps streaming |
-| `perpDexStatus` (`dex`) | `totalNetDeposit` | santé globale |
-| `allPerpMetas` | tous les univers + ctx en un call | snapshot complet économe |
-| `perpAnnotation` / `perpCategories` / `perpConciseAnnotations` | métadonnées/catégories | nouveaux actifs taggés |
+| `metaAndAssetCtxs` (`dex`) | universe + live ctx: `openInterest`, `markPx`, `oraclePx`, `funding`, `dayNtlVlm` | real OI vs cap |
+| `perpsAtOpenInterestCap` (`dex`) | list of perps sitting at their OI cap | pre-"OI increase" signal |
+| `perpDexs` (no `dex`) | all dexs: `deployer`, `oracleUpdater`, `feeRecipient`, `assetToStreamingOiCap`, `assetToFundingMultiplier` | identity check + streaming caps |
+| `perpDexStatus` (`dex`) | `totalNetDeposit` | global health |
+| `allPerpMetas` | all universes + ctx in one call | cheap full snapshot |
+| `perpAnnotation` / `perpCategories` / `perpConciseAnnotations` | metadata/categories | tagged new assets |
 
-### Mapping event → action → champ à diff
+### Event → action → diffed field mapping
 
-| Event | Action L1 | Champ détecté |
+| Event | L1 action | Detected field |
 |---|---|---|
-| OI cap modifié | `setOpenInterestCaps` | `perpDexLimits.coinToOiCap`, `totalOiCap` |
-| Mode de marge changé | `setMarginModes` | `meta.universe[].marginMode` (détecter aussi → `normal`/cross) |
-| Levier max changé | `setMarginTableIds` | `meta.universe[].maxLeverage` + `meta.marginTables[]` |
-| Nouveau marché | `registerAsset(2)` | nouvelle entrée dans `meta.universe[]` |
-| Halt / reprise | `haltTrading` | **À VÉRIFIER** — champ de statut côté API (probablement un flag ; sinon déduire via disparition de ctx / `isDelisted`) |
+| OI cap changed | `setOpenInterestCaps` | `perpDexLimits.coinToOiCap`, `totalOiCap` |
+| Margin mode changed | `setMarginModes` | `meta.universe[].marginMode` (also detect → `normal`/cross) |
+| Max leverage changed | `setMarginTableIds` | `meta.universe[].maxLeverage` + `meta.marginTables[]` |
+| New market | `registerAsset(2)` | new entry in `meta.universe[]` |
+| Halt / resume | `haltTrading` | **TO VERIFY** — API status field (likely a flag; otherwise infer via ctx disappearance / `isDelisted`) |
 
 ---
 
 ## 5. Architecture
 
-**Pattern : daemon long-running** (PAS un cron). Raisons : cron a une granularité ≥ 1 min (trop lent) et perd l'état entre exécutions (or on a besoin du snapshot précédent). Le process tourne en continu sous **systemd** (restart auto si crash).
+**Pattern: long-running daemon** (NOT a cron). Reasons: cron has ≥ 1 min granularity (too slow)
+and loses state between runs (we need the previous snapshot). The process runs continuously
+under **systemd** (auto-restart on crash).
 
 ```
 ┌─────────────────────────────────────────────┐
-│  systemd service (micro VM AWS)              │
+│  systemd service (micro VM)                  │
 │                                              │
-│   boucle toutes les N s (cible 2–5 s) :      │
-│     1. fetch  : POST /info (meta, perpDexLimits, [metaAndAssetCtxs]) dex="xyz"
-│     2. normalize : extraire les champs structurels par coin
-│     3. diff   : vs dernier snapshot en base (IGNORER oraclePx/markPx)
-│     4. si delta : composer message + INSERT event (idempotence) + envoyer Telegram
-│     5. persister le nouveau snapshot
+│   loop every N s (target 2–5 s):             │
+│     1. fetch  : POST /info (meta, perpDexLimits) dex="xyz"
+│     2. normalize : extract structural fields per coin
+│     3. diff   : vs last snapshot in DB (IGNORE oraclePx/markPx)
+│     4. on delta : compose message + INSERT event (idempotency) + send Telegram
+│     5. persist the new snapshot
 │     6. sleep N s                             │
 └──────────────┬───────────────────────────────┘
                │
-        PostgreSQL (fournie par fb)
+        PostgreSQL
                │
-        Telegram Bot API (canal cible)
+        Telegram Bot API (target channel)
 ```
 
-**REST polling confirmé par fb** : pas de flux WebSocket pour ces changements de config → l'archi est bien un **polling court**, pas de fallback WS à prévoir.
+**REST polling confirmed**: no WebSocket feed for these config changes → the architecture is
+**short polling**, no WS fallback to plan for.
 
-### Réactivité
-Latence ≈ intervalle de poll. L'oracle se met à jour ~toutes les 3 s, donc un poll **2–5 s** donne du quasi-temps-réel pour les changements de config. Valider les **rate limits** de l'info API avant de descendre trop bas.
+### Reactivity
+Latency ≈ poll interval. The oracle updates ~every 3s, so a **2–5s** poll gives near real-time for
+config changes. Validate the info-API **rate limits** before going too low.
 
 ---
 
-## 6. Modèle de données (PostgreSQL)
+## 6. Data model (PostgreSQL)
 
 ```sql
--- État courant par (dex, coin) : sert de base au diff
+-- Current state per (dex, coin): basis for the diff
 CREATE TABLE market_state (
   dex            TEXT NOT NULL,
   coin           TEXT NOT NULL,
@@ -156,14 +180,14 @@ CREATE TABLE market_state (
   PRIMARY KEY (dex, coin)
 );
 
--- Limites globales du dex
+-- Dex-wide limits
 CREATE TABLE dex_state (
   dex          TEXT PRIMARY KEY,
   total_oi_cap NUMERIC,
   updated_at   TIMESTAMPTZ DEFAULT now()
 );
 
--- Journal des events détectés = idempotence anti-doublon
+-- Journal of detected events = anti-duplicate idempotency
 CREATE TABLE events (
   id          BIGSERIAL PRIMARY KEY,
   dex         TEXT NOT NULL,
@@ -171,48 +195,52 @@ CREATE TABLE events (
   event_type  TEXT NOT NULL,    -- oi_cap_change | margin_mode_change | leverage_change | new_market | halt | ...
   old_value   TEXT,
   new_value   TEXT,
-  dedup_key   TEXT UNIQUE,      -- ex: sha256(dex|coin|event_type|new_value) → INSERT ON CONFLICT DO NOTHING
+  dedup_key   TEXT UNIQUE,      -- e.g. sha256(dex|coin|event_type|new_value) → INSERT ON CONFLICT DO NOTHING
   notified_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 ```
 
-Logique anti-doublon : calculer `dedup_key` par event ; `INSERT ... ON CONFLICT (dedup_key) DO NOTHING` ; n'envoyer le Telegram que si l'insert a réellement créé une ligne.
+Anti-duplicate logic: compute `dedup_key` per event; `INSERT ... ON CONFLICT (dedup_key) DO
+NOTHING`; only send the Telegram message if the insert actually created a row.
 
 ---
 
-## 7. Format des messages Telegram (proposition)
+## 7. Telegram message format (proposal)
 
 ```
-🟢 OI cap augmenté — xyz:NVDA
+🟢 OI cap increased — xyz:NVDA
 5,000,000 → 10,000,000 USDC
 {timestamp UTC}
 
-⚙️ Mode de marge — xyz:TSLA
-noCross → normal (cross activé)
+⚙️ Margin mode — xyz:TSLA
+noCross → normal (cross enabled)
 
-📈 Levier max — xyz:AAPL
+📈 Max leverage — xyz:AAPL
 10x → 20x
 
-🆕 Nouveau marché listé — xyz:META
-levier 10x · strictIsolated · OI cap 2,000,000
+🆕 New market listed — xyz:META
+leverage 10x · strictIsolated · OI cap 2,000,000
 
-⛔ Trading halté — xyz:AMZN   /   ✅ Trading repris — xyz:AMZN
+⛔ Trading halted — xyz:AMZN   /   ✅ Trading resumed — xyz:AMZN
 ```
-À confirmer avec fb : canal cible, niveau de détail, faut-il un message par coin ou un message groupé quand une action touche plusieurs coins.
+To confirm: target channel, level of detail, whether to send one message per coin or a grouped
+message when an action touches several coins.
 
 ---
 
-## 8. Stack & déploiement
+## 8. Stack & deployment
 
-- **Langage** : Python 3.11+ (httpx + asyncio) ou Node 20 (fetch + setInterval). Au choix de l'implémenteur ; Python recommandé pour la simplicité du polling/async.
-- **DB** : PostgreSQL (fournie par fb).
-- **Hébergement** : micro VM AWS (fournie par fb), service **systemd** (`Restart=always`), déploiement via SSH.
-- **Config via variables d'env** : `HL_API_URL`, `DEX_NAME=xyz`, `POLL_INTERVAL_SEC`, `PG_DSN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-- **Secrets** : jamais en clair dans le repo ; `.env` non commité / secrets manager.
-- **Observabilité** : log structuré + un heartbeat (ex. ping « still alive » quotidien ou métrique) pour savoir si le service tourne.
+- **Language**: Python 3.11+ (httpx + asyncio). Python recommended for polling/async simplicity.
+- **DB**: PostgreSQL.
+- **Hosting**: a micro Linux VM, **systemd** service (`Restart=always`), deployed over SSH.
+- **Config via env vars**: `HL_API_URL`, `DEX_NAME=xyz`, `POLL_INTERVAL_SEC`, `PG_DSN`,
+  `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+- **Secrets**: never in clear text in the repo; `.env` not committed / secrets manager.
+- **Observability**: structured logging + a heartbeat (e.g. a daily "still alive" ping or metric)
+  to know whether the service is running.
 
-### Exemple de unit systemd
+### Example systemd unit
 ```ini
 [Unit]
 Description=xyz deployer alert bot
@@ -231,27 +259,34 @@ WantedBy=multi-user.target
 
 ---
 
-## 9. Plan de développement (milestones)
+## 9. Development plan (milestones)
 
-1. **M0 — Cadrage** : ✅ events / audience / REST / sub-deployers tranchés avec fb (voir §10). Reste à régler : canal Telegram exact, latence cible, rate limits. Récupérer accès DB + VM.
-2. **M1 — Lecture** : client info API ; fetch + parse `meta`, `perpDexLimits`, `metaAndAssetCtxs` pour `dex="xyz"`. Logguer un snapshot lisible.
-3. **M2 — Persistance & diff** : schéma SQL ; normalisation par coin ; moteur de diff (en ignorant oracle/mark) qui produit une liste d'events typés.
-4. **M3 — Notifications** : intégration Telegram Bot API ; templates de messages ; idempotence via `dedup_key`.
-5. **M4 — Daemon & déploiement** : boucle async + backoff sur erreur API ; unit systemd ; déploiement SSH sur la VM ; logs + heartbeat.
-6. **M5 — Durcissement** : gestion des rate limits, reconnections, alerte si l'API est down, tests sur un changement réel (ou simulé en injectant un faux snapshot précédent).
-7. **M6 (option)** : extension multi-dex ; second canal Telegram ; couche « signal pré-OI-increase » plus riche.
+1. **M0 — Scoping**: ✅ events / audience / REST / sub-deployers settled (see §10). Still to settle:
+   exact Telegram channel, target latency, rate limits. Get DB + VM access.
+2. **M1 — Read**: info API client; fetch + parse `meta`, `perpDexLimits` for `dex="xyz"`. Log a
+   readable snapshot.
+3. **M2 — Persistence & diff**: SQL schema; per-coin normalization; diff engine (ignoring
+   oracle/mark) producing a list of typed events.
+4. **M3 — Notifications**: Telegram Bot API integration; message templates; idempotency via `dedup_key`.
+5. **M4 — Daemon & deployment**: async loop + backoff on API error; systemd unit; SSH deployment;
+   logs + heartbeat.
+6. **M5 — Hardening**: rate-limit handling, reconnections, alert if the API is down, test on a real
+   change (or simulated by injecting a fake previous snapshot).
+7. **M6 (optional)**: multi-dex extension; second Telegram channel; richer "pre-OI-increase" signal.
 
 ---
 
-## 10. Points tranchés (réponses de fb) & risques restants
+## 10. Settled points & remaining risks
 
-**Tranché par fb :**
-- **Transitions de marge** : sens unique `strictIsolated → noCross → normal (cross)`, jamais en arrière. → le bot détecte les passages vers cross aussi.
-- **REST polling only** : pas de WebSocket pour ces changements → polling court, point final.
-- **Audience** : retail + autres groupes Telegram (pas les MM, déjà équipés). Outil public.
-- **Sub-deployers** : ils existent. → on surveille par **diff d'état** (agnostique à l'adresse-auteur), pas besoin de lister les sub-deployers.
+**Settled:**
+- **Margin transitions**: one-way `strictIsolated → noCross → normal (cross)`, never backwards.
+  → the bot also detects moves to cross.
+- **REST polling only**: no WebSocket for these changes → short polling, final.
+- **Audience**: retail + other Telegram groups (not MMs, already equipped). Public tool.
+- **Sub-deployers**: they exist. → monitor by **state diff** (agnostic to the signing address);
+  no need to list the sub-deployers.
 
-**Risques / points encore ouverts (à lever avant M2) :**
-- **Détection des halts** : champ API non confirmé (à vérifier en M1 sur des données réelles).
-- **Rate limits** de l'info API en polling rapproché.
-- **Canal Telegram** cible exact + latence visée (à finaliser avec fb).
+**Risks / still-open points:**
+- **Halt detection**: API field unconfirmed (verify on real data).
+- **Rate limits** of the info API under tight polling.
+- **Target Telegram channel** + target latency (to finalize).

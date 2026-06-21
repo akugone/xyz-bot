@@ -1,4 +1,4 @@
-"""Tests M3 : formatage des events en messages Telegram (pur, sans réseau)."""
+"""Event → Telegram message formatting tests (pure, no network)."""
 from src.events import (
     DELISTED,
     HALT,
@@ -61,9 +61,9 @@ def test_delisted():
 
 
 def test_amount_keeps_non_integer_and_raw():
-    # valeur fractionnaire conservée
+    # fractional value preserved
     msg = format_event(Event("xyz", "xyz:X", OI_CAP_CHANGE, "1000000.5", "2000000.25"))
     assert "1,000,000.5 → 2,000,000.25" in msg
-    # valeur non numérique → brute, pas de crash
+    # non-numeric value → raw, no crash
     msg2 = format_event(Event("xyz", "xyz:X", OI_CAP_CHANGE, None, "n/a"))
     assert "? → n/a" in msg2

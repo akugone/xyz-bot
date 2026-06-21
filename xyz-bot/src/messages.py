@@ -1,7 +1,7 @@
-"""Formatage des events en messages Telegram (texte).
+"""Format events into Telegram messages (text).
 
-Module pur (aucun réseau) : `format_event(Event) -> str`. Les formats suivent le SPEC §7.
-Testable isolément ; consommé par `src/telegram.py`.
+Pure module (no network): `format_event(Event) -> str`. The formats follow the SPEC.
+Testable in isolation; consumed by `src/telegram.py`.
 """
 from __future__ import annotations
 
@@ -49,12 +49,12 @@ def format_event(ev: Event) -> str:
     if t == DELISTED:
         return f"🗑️ Market delisted — {coin}"
 
-    # fallback générique (ne devrait pas arriver si tous les types sont gérés)
-    return f"ℹ️ {t} — {coin} : {ev.old_value} → {ev.new_value}"
+    # generic fallback (shouldn't happen if all types are handled)
+    return f"ℹ️ {t} — {coin}: {ev.old_value} → {ev.new_value}"
 
 
 def _amount(v: str | None) -> str:
-    """Formate un notionnel : "5000000.0" → "5,000,000". Renvoie la valeur brute si non numérique."""
+    """Format a notional: "5000000.0" → "5,000,000". Returns the raw value if non-numeric."""
     if v is None:
         return "?"
     try:
@@ -67,7 +67,7 @@ def _amount(v: str | None) -> str:
 
 
 def _new_market_detail(v: str | None) -> str:
-    """Déplie le new_value d'un nouveau marché ("lev=10;mode=strictIsolated;oi_cap=2000000.0")."""
+    """Unpack a new market's new_value ("lev=10;mode=strictIsolated;oi_cap=2000000.0")."""
     parts = dict(p.split("=", 1) for p in v.split(";") if "=" in p) if v else {}
     lev = parts.get("lev", "?")
     mode = parts.get("mode", "?")

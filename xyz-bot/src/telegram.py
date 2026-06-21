@@ -1,9 +1,9 @@
-"""Envoi des notifications via l'API Telegram Bot.
+"""Send notifications via the Telegram Bot API.
 
-`TelegramNotifier.send(text)` poste un message dans le chat cible.
-**Mode dry-run** : si activé (ou si le token est absent), on logue le message au lieu
-de l'envoyer — permet de développer/tester M3 sans bot réel. Bascule en envoi réel dès
-que `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` sont fournis et le dry-run désactivé.
+`TelegramNotifier.send(text)` posts a message to the target chat.
+**Dry-run mode**: if enabled (or if the token is missing), the message is logged instead of
+sent — lets you develop/test without a real bot. Switches to real sending as soon as
+`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` are provided and dry-run is off.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class TelegramNotifier:
     ):
         self._token = token
         self._chat_id = chat_id
-        # dry-run forcé OU pas de token/chat → on n'envoie rien pour de vrai.
+        # forced dry-run OR no token/chat → don't actually send anything.
         self._dry_run = dry_run or not token or not chat_id
         self._client = client or httpx.AsyncClient(timeout=timeout)
 
@@ -34,7 +34,7 @@ class TelegramNotifier:
         return self._dry_run
 
     async def send(self, text: str, chat_id: str | None = None) -> None:
-        """Envoie `text`. `chat_id` permet de cibler un autre chat (ex. canal d'alertes ops)."""
+        """Send `text`. `chat_id` targets a different chat (e.g. the ops alerts chat)."""
         target = chat_id or self._chat_id
         if self._dry_run:
             log.info("[DRY-RUN telegram] → chat=%s\n%s", target, text)

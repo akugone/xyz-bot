@@ -1,6 +1,6 @@
-"""Tests M1 : construction du snapshot à partir des réponses meta + perpDexLimits.
+"""Snapshot building tests, from meta + perpDexLimits responses.
 
-Sans réseau : on alimente `build_snapshot` avec les fixtures capturées sur l'API réelle.
+No network: `build_snapshot` is fed with fixtures captured from the real API.
 """
 from src.snapshot import build_snapshot
 
@@ -33,10 +33,10 @@ def test_margin_mode_isolated_preserved():
 
 
 def test_margin_mode_absent_normalized_to_normal():
-    """Découverte M1 : marginMode absent = marché cross → doit devenir "normal".
+    """Finding: absent marginMode = cross market → must become "normal".
 
-    Garantit que le diff captera bien la transition `noCross → normal (cross)`
-    au lieu de voir `noCross → None`.
+    Ensures the diff catches the `noCross → normal (cross)` transition instead of seeing
+    `noCross → None`.
     """
     assert make_snapshot().coins["xyz:XYZ100"].margin_mode == "normal"
 
@@ -47,21 +47,20 @@ def test_delisted_market_flagged():
 
 
 def test_oi_cap_values_are_strings():
-    """Les caps restent des strings décimales (pas de float) pour éviter toute
-    perte de précision sur de gros notionnels."""
+    """Caps stay decimal strings (not floats) to avoid precision loss on large notionals."""
     snap = make_snapshot()
     assert isinstance(snap.total_oi_cap, str)
     assert isinstance(snap.coins["xyz:XYZ100"].oi_cap, str)
 
 
 def test_halt_field_absent_when_no_halt():
-    """Aucun champ isHalted dans la fixture (aucun marché halté) → is_halted = None.
-    À reconfirmer sur un vrai halt avant M2."""
+    """No isHalted field in the fixture (no halted market) → is_halted = None.
+    To re-confirm on a real halt."""
     assert make_snapshot().coins["xyz:HOOD"].is_halted is None
 
 
 def test_coin_missing_oi_cap_is_none():
-    """Un coin présent dans meta mais absent de coinToOiCap → oi_cap = None (pas d'erreur)."""
+    """A coin present in meta but absent from coinToOiCap → oi_cap = None (no error)."""
     meta = {"universe": [{"name": "xyz:GHOST", "maxLeverage": 5, "marginTableId": 5,
                           "onlyIsolated": True, "marginMode": "noCross"}],
             "marginTables": []}

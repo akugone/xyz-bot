@@ -1,7 +1,7 @@
-"""Tests M2 : moteur de diff entre snapshots.
+"""Diff engine tests.
 
-Pur calcul en mémoire — aucune base, aucun réseau. On construit des snapshots à la
-main et on vérifie les events produits.
+Pure in-memory computation — no DB, no network. We build snapshots by hand and check
+the produced events.
 """
 import copy
 
@@ -35,7 +35,7 @@ def base_snapshot() -> Snapshot:
 
 
 def test_seed_first_run_emits_nothing():
-    """prev is None → seed silencieux : aucun event (on ne pinge pas la baseline)."""
+    """prev is None → silent seed: no event (we don't ping the baseline)."""
     assert diff(None, base_snapshot()) == []
 
 
@@ -67,7 +67,7 @@ def test_total_oi_cap_change_is_dex_level():
 
 
 def test_margin_mode_to_cross():
-    """La transition vers cross apparaît bien comme noCross → normal (cf. découverte M1)."""
+    """The move to cross shows up as noCross → normal (see finding)."""
     prev = base_snapshot()
     curr = copy.deepcopy(prev)
     curr.coins["xyz:HOOD"].margin_mode = "normal"
@@ -101,13 +101,13 @@ def test_new_market():
 
 def test_halt_and_unhalt():
     prev = base_snapshot()
-    # halt : is_halted None/False → True
+    # halt: is_halted None/False → True
     curr = copy.deepcopy(prev)
     curr.coins["xyz:HOOD"].is_halted = True
     events = diff(prev, curr)
     assert [e.event_type for e in events] == [HALT]
 
-    # reprise : True → False
+    # resume: True → False
     prev2 = copy.deepcopy(curr)
     curr2 = copy.deepcopy(curr)
     curr2.coins["xyz:HOOD"].is_halted = False
@@ -139,16 +139,16 @@ def test_dedup_key_stable_and_distinct():
     curr.coins["xyz:HOOD"].oi_cap = "100000000.0"
     e1 = diff(prev, curr)[0]
     e2 = diff(prev, copy.deepcopy(curr))[0]
-    # même changement détecté deux fois → même dedup_key (idempotence)
+    # same change detected twice → same dedup_key (idempotency)
     assert e1.dedup_key == e2.dedup_key
-    # un event différent → clé différente
+    # a different event → different key
     other = base_snapshot()
     other.coins["xyz:HOOD"].max_leverage = 20
     assert diff(prev, other)[0].dedup_key != e1.dedup_key
 
 
 def test_unchanged_halt_none_no_event():
-    """is_halted None → None ne doit pas générer d'event (cas nominal, aucun halt)."""
+    """is_halted None → None must not produce an event (nominal case, no halt)."""
     prev = base_snapshot()
     curr = copy.deepcopy(prev)
     assert not any(e.event_type in (HALT, UNHALT) for e in diff(prev, curr))

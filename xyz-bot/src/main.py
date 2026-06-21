@@ -1,8 +1,8 @@
-"""Point d'entrée du daemon xyz-bot.
+"""Entry point of the xyz-bot daemon.
 
-`run_loop()` (entrée prod) : boucle résiliente fetch → diff → notif Telegram → persiste,
-avec backoff sur erreur, heartbeat et arrêt propre sur SIGTERM (systemd).
-`run_once()` : un seul cycle de lecture (debug M1).
+`run_loop()` (prod entry): resilient loop fetch → diff → Telegram notify → persist,
+with backoff on error, heartbeat, and graceful shutdown on SIGTERM (systemd).
+`run_once()`: a single read cycle (debug).
 """
 from __future__ import annotations
 
@@ -25,17 +25,17 @@ log = logging.getLogger("xyz-bot")
 
 
 def backoff_delay(errors: int) -> float:
-    """Délai avant le prochain cycle : poll normal si 0 erreur, sinon backoff exp. plafonné."""
+    """Delay before the next cycle: normal poll if 0 errors, else capped exponential backoff."""
     if not errors:
         return config.poll_interval_sec
     return min(config.poll_interval_sec * (2 ** errors), config.error_backoff_max_sec)
 
 
 def api_alert_action(errors: int, threshold: int, alerted: bool) -> str | None:
-    """Transition de l'état API → 'down' (à alerter), 'up' (rétabli), ou None (rien).
+    """API state transition → 'down' (alert), 'up' (recovered), or None (nothing).
 
-    'down' : on a atteint le seuil d'erreurs consécutives et on n'a pas encore alerté.
-    'up'   : un cycle vient de réussir (errors == 0) alors qu'on était en état alerté.
+    'down': consecutive-error threshold reached and we haven't alerted yet.
+    'up'  : a cycle just succeeded (errors == 0) while we were in the alerted state.
     """
     if errors >= threshold and not alerted:
         return "down"
@@ -45,7 +45,7 @@ def api_alert_action(errors: int, threshold: int, alerted: bool) -> str | None:
 
 
 async def fetch_snapshot(client: HyperliquidClient, dex: str) -> Snapshot:
-    """Récupère meta + perpDexLimits et construit un snapshot par coin."""
+    """Fetch meta + perpDexLimits and build a per-coin snapshot."""
     meta, limits = await asyncio.gather(
         client.get_meta(dex),
         client.get_perp_dex_limits(dex),
@@ -54,7 +54,7 @@ async def fetch_snapshot(client: HyperliquidClient, dex: str) -> Snapshot:
 
 
 async def run_once() -> None:
-    """M1 : un cycle de lecture, pour vérifier la connectivité et le parsing."""
+    """A single read cycle, to check connectivity and parsing."""
     client = HyperliquidClient()
     try:
         snap = await fetch_snapshot(client, config.dex_name)
@@ -74,29 +74,29 @@ async def run_cycle(
     notifier: TelegramNotifier,
     prev_snapshot: Snapshot | None,
 ) -> Snapshot:
-    """Un cycle complet : fetch → diff → notifie les inédits → persiste. Renvoie le snapshot.
+    """One full cycle: fetch → diff → notify fresh events → persist. Returns the snapshot.
 
-    Le snapshot précédent vient de Postgres si `db`, sinon de `prev_snapshot` (fallback mémoire).
-    Au 1er run sans baseline (`prev is None`) → seed silencieux (aucune alerte).
+    The previous snapshot comes from Postgres if `db`, else from `prev_snapshot` (memory fallback).
+    On the first run with no baseline (`prev is None`) → silent seed (no alert).
     """
     snap = await fetch_snapshot(client, config.dex_name)
     prev = await db.load_snapshot(snap.dex) if db is not None else prev_snapshot
     events = diff(prev, snap)
 
     if prev is None:
-        log.info("seed — baseline de %d coins enregistrée (aucune alerte)", len(snap.coins))
+        log.info("seed — baseline of %d coins recorded (no alert)", len(snap.coins))
     else:
         new_events = await db.record_new_events(events) if db is not None else events
         sent = []
         for ev in new_events:
-            log.info("EVENT %-20s %-14s %s → %s",
+            log.info("EVENT %-20s %-14s %s -> %s",
                      ev.event_type, ev.coin or "(dex)", ev.old_value, ev.new_value)
             await notifier.send(format_event(ev))
             sent.append(ev.dedup_key)
         if db is not None and sent:
             await db.mark_notified(sent)
         if not new_events:
-            log.info("cycle ok — %d coins, aucun changement", len(snap.coins))
+            log.info("cycle ok — %d coins, no change", len(snap.coins))
 
     if db is not None:
         await db.save_snapshot(snap)
@@ -104,53 +104,53 @@ async def run_cycle(
 
 
 async def _ops_alert(notifier: TelegramNotifier, text: str) -> None:
-    """Alerte d'exploitation → chat admin si configuré, sinon seulement loggée (best-effort)."""
+    """Ops alert → admin chat if configured, otherwise just logged (best-effort)."""
     log.warning("OPS ALERT: %s", text)
     if config.telegram_admin_chat_id:
         try:
             await notifier.send(text, chat_id=config.telegram_admin_chat_id)
         except Exception:  # noqa: BLE001
-            log.exception("envoi alerte ops KO")
+            log.exception("ops alert send failed")
 
 
 async def run_loop() -> None:
-    """Boucle daemon de prod : résiliente (backoff sur erreur), heartbeat, arrêt propre.
+    """Production daemon loop: resilient (backoff on error), heartbeat, graceful shutdown.
 
-    - **Backoff** : après une erreur, le délai croît (2×, 4×… plafonné) pour ne pas
-      marteler une API en panne ; il revient au poll normal dès qu'un cycle réussit.
-    - **Heartbeat** : ligne de log « vivant » périodique (observabilité), pas d'envoi Telegram.
-    - **Arrêt propre** : SIGTERM/SIGINT (systemd `stop`) interrompt l'attente et ferme
-      proprement client HTTP, notifier et pool Postgres.
+    - **Backoff**: after an error the delay grows (2x, 4x… capped) to avoid hammering a
+      down API; it returns to the normal poll as soon as a cycle succeeds.
+    - **Heartbeat**: periodic "alive" log line (observability), no Telegram message.
+    - **Graceful shutdown**: SIGTERM/SIGINT (systemd `stop`) interrupts the wait and cleanly
+      closes the HTTP client, notifier, and Postgres pool.
     """
     client = HyperliquidClient()
     db = Database(config.pg_dsn) if config.pg_dsn else None
     notifier = TelegramNotifier(
         config.telegram_bot_token, config.telegram_chat_id, dry_run=config.telegram_dry_run
     )
-    last_snap: Snapshot | None = None  # dernier snapshot (fallback mémoire si pas de DB)
+    last_snap: Snapshot | None = None  # last snapshot (memory fallback if no DB)
 
     if db is not None:
         await db.connect()
         await db.init_schema()
-        log.info("persistance Postgres active")
+        log.info("Postgres persistence active")
     else:
-        log.warning("PG_DSN absent — persistance désactivée (état en mémoire, perdu au redémarrage)")
-    log.info("notifications Telegram : %s", "DRY-RUN (logs)" if notifier.dry_run else "envoi réel")
+        log.warning("PG_DSN missing — persistence disabled (in-memory state, lost on restart)")
+    log.info("Telegram notifications: %s", "DRY-RUN (logs)" if notifier.dry_run else "real sending")
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:
             loop.add_signal_handler(sig, stop.set)
-        except NotImplementedError:  # pragma: no cover — plateformes sans add_signal_handler
+        except NotImplementedError:  # pragma: no cover — platforms without add_signal_handler
             pass
 
     errors = 0
     last_markets = 0
-    api_alerted = False  # a-t-on déjà prévenu que l'API est down ?
+    api_alerted = False  # have we already warned that the API is down?
     started_at = datetime.now(timezone.utc)
     last_heartbeat = time.monotonic()
-    log.info("démarrage de la boucle (poll=%ss)", config.poll_interval_sec)
+    log.info("loop starting (poll=%ss)", config.poll_interval_sec)
 
     try:
         while not stop.is_set():
@@ -158,11 +158,11 @@ async def run_loop() -> None:
                 last_snap = await run_cycle(client, db, notifier, last_snap)
                 last_markets = len(last_snap.coins)
                 errors = 0
-            except Exception:  # noqa: BLE001 — résilience daemon
+            except Exception:  # noqa: BLE001 — daemon resilience
                 errors += 1
-                log.exception("cycle en erreur (%d consécutive[s]), backoff", errors)
+                log.exception("cycle failed (%d consecutive), backing off", errors)
 
-            # alerte ops « API down » / « rétablie » (sur transition, pas de spam)
+            # ops alert "API down" / "recovered" (on transition, no spam)
             action = api_alert_action(errors, config.api_down_threshold, api_alerted)
             if action == "down":
                 api_alerted = True
@@ -172,25 +172,25 @@ async def run_loop() -> None:
                 api_alerted = False
                 await _ops_alert(notifier, "✅ xyz-bot: Hyperliquid API recovered. Monitoring resumed.")
 
-            # heartbeat en base (alimente la page de statut) — best-effort
+            # heartbeat to the DB (feeds the status page) — best-effort
             if db is not None:
                 try:
                     await db.record_heartbeat(config.dex_name, started_at, last_markets, errors)
                 except Exception:  # noqa: BLE001
-                    log.exception("heartbeat en base KO")
+                    log.exception("heartbeat write failed")
 
             now = time.monotonic()
             if config.heartbeat_interval_sec and now - last_heartbeat >= config.heartbeat_interval_sec:
-                log.info("heartbeat — vivant, %d erreur(s) consécutive(s)", errors)
+                log.info("heartbeat — alive, %d consecutive error(s)", errors)
                 last_heartbeat = now
 
-            # attendre le délai (poll ou backoff), mais se réveiller aussitôt si arrêt demandé
+            # wait the delay (poll or backoff), but wake up immediately if shutdown is requested
             try:
                 await asyncio.wait_for(stop.wait(), timeout=backoff_delay(errors))
             except asyncio.TimeoutError:
                 pass
     finally:
-        log.info("arrêt — fermeture des ressources")
+        log.info("shutting down — closing resources")
         await client.aclose()
         await notifier.aclose()
         if db is not None:

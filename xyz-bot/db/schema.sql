@@ -1,7 +1,7 @@
--- Schéma PostgreSQL du bot xyz-bot
--- Voir CLAUDE.md / ../xyz-deployer-bot-SPEC.md §6
+-- PostgreSQL schema for xyz-bot
+-- See CLAUDE.md / ../xyz-deployer-bot-SPEC.md §6
 
--- État courant par (dex, coin) : base du diff
+-- Current state per (dex, coin): the basis for the diff
 CREATE TABLE IF NOT EXISTS market_state (
   dex             TEXT NOT NULL,
   coin            TEXT NOT NULL,
@@ -17,23 +17,23 @@ CREATE TABLE IF NOT EXISTS market_state (
   PRIMARY KEY (dex, coin)
 );
 
--- Limites globales du dex
+-- Dex-wide limits
 CREATE TABLE IF NOT EXISTS dex_state (
   dex          TEXT PRIMARY KEY,
   total_oi_cap NUMERIC,
   updated_at   TIMESTAMPTZ DEFAULT now()
 );
 
--- Heartbeat / santé du bot (1 ligne par dex) : alimente la page de statut publique
+-- Bot heartbeat / health (1 row per dex): feeds the public status page
 CREATE TABLE IF NOT EXISTS bot_status (
   dex                TEXT PRIMARY KEY,
-  started_at         TIMESTAMPTZ,    -- début du process courant
-  last_cycle_at      TIMESTAMPTZ,    -- dernier cycle (sert au up/down par fraîcheur)
+  started_at         TIMESTAMPTZ,    -- start of the current process
+  last_cycle_at      TIMESTAMPTZ,    -- last cycle (drives up/down by freshness)
   markets_count      INT,
   consecutive_errors INT DEFAULT 0
 );
 
--- Journal des events détectés = idempotence anti-doublon
+-- Journal of detected events = anti-duplicate idempotency
 CREATE TABLE IF NOT EXISTS events (
   id          BIGSERIAL PRIMARY KEY,
   dex         TEXT NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS events (
   event_type  TEXT NOT NULL,     -- oi_cap_change | margin_mode_change | leverage_change | new_market | halt | ...
   old_value   TEXT,
   new_value   TEXT,
-  dedup_key   TEXT UNIQUE,       -- ex: sha256(dex|coin|event_type|new_value) ; INSERT ON CONFLICT DO NOTHING
+  dedup_key   TEXT UNIQUE,       -- e.g. sha256(dex|coin|event_type|new_value) ; INSERT ON CONFLICT DO NOTHING
   notified_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ DEFAULT now()
 );

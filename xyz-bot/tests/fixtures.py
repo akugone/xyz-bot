@@ -1,11 +1,11 @@
-"""Fixtures inspirées des vraies réponses de l'info API Hyperliquid (dex=xyz).
+"""Fixtures inspired by real Hyperliquid info API responses (dex=xyz).
 
-Capturées le 2026-06-21 via `meta` / `perpDexLimits`. Réduites à un échantillon
-représentatif des cas qui comptent pour le diff :
-  - marché isolé `noCross` (HOOD) : marginMode présent + onlyIsolated
-  - marché isolé `strictIsolated` (MINIMAX)
-  - marché cross `normal` (XYZ100) : marginMode ABSENT → doit être normalisé en "normal"
-  - marché delisté (DXY) : isDelisted=True → is_listed=False
+Captured on 2026-06-21 via `meta` / `perpDexLimits`. Reduced to a representative sample
+of the cases that matter for the diff:
+  - isolated `noCross` market (HOOD): marginMode present + onlyIsolated
+  - isolated `strictIsolated` market (MINIMAX)
+  - cross `normal` market (XYZ100): marginMode ABSENT → must be normalized to "normal"
+  - delisted market (DXY): isDelisted=True → is_listed=False
 """
 
 META_RESPONSE = {
@@ -23,7 +23,7 @@ META_RESPONSE = {
             "lastGrowthModeChangeTime": "2025-11-23T17:37:10.033211662",
         },
         {
-            # cross-enabled : pas de marginMode, pas de onlyIsolated
+            # cross-enabled: no marginMode, no onlyIsolated
             "szDecimals": 4, "name": "xyz:XYZ100", "maxLeverage": 30,
             "marginTableId": 30, "growthMode": "enabled",
             "lastGrowthModeChangeTime": "2025-11-23T17:37:10.033211662",

@@ -1,4 +1,4 @@
-"""Tests M3 : TelegramNotifier — dry-run (aucun réseau) vs envoi réel (httpx mocké)."""
+"""TelegramNotifier tests — dry-run (no network) vs real sending (httpx mocked)."""
 import asyncio
 
 import httpx
@@ -7,10 +7,10 @@ from src.telegram import TelegramNotifier
 
 
 def test_dry_run_when_no_token():
-    """Sans token, le notifier est forcément en dry-run (n'envoie rien)."""
+    """Without a token, the notifier is forced into dry-run (sends nothing)."""
     n = TelegramNotifier(token=None, chat_id="123", dry_run=False)
     assert n.dry_run is True
-    asyncio.run(n.send("hello"))  # ne doit pas lever (pas d'appel réseau)
+    asyncio.run(n.send("hello"))  # must not raise (no network call)
     asyncio.run(n.aclose())
 
 
@@ -22,7 +22,7 @@ def test_dry_run_explicit():
 
 
 def test_real_send_posts_to_telegram_api():
-    """Avec token + chat et dry-run off : POST vers l'API Telegram avec le bon payload."""
+    """With token + chat and dry-run off: POST to the Telegram API with the right payload."""
     captured = {}
 
     def handler(request: httpx.Request) -> httpx.Response:

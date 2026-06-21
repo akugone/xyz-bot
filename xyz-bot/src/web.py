@@ -1,10 +1,10 @@
-"""Page de statut publique du bot (service web séparé, lecture seule de Postgres).
+"""Public status page (separate web service, read-only access to Postgres).
 
-Découplé du daemon : tourne dans son propre process/service systemd. Sert :
-  - `GET /`            → page HTML (statut + dernières alertes), auto-refresh
-  - `GET /status.json` → même info en JSON (machine-readable / monitoring)
+Decoupled from the daemon: runs in its own process / systemd service. Serves:
+  - `GET /`            → HTML page (status + latest alerts), auto-refresh
+  - `GET /status.json` → same info as JSON (machine-readable / monitoring)
 
-Les fonctions `status_payload` et `render_html` sont **pures** (pas de DB/HTTP) → testables.
+`status_payload` and `render_html` are **pure** (no DB/HTTP) → testable.
 """
 from __future__ import annotations
 
@@ -17,18 +17,18 @@ from aiohttp import web
 from .config import config
 from .db import Database
 
-# Cache court des lectures DB : amortit les requêtes si la page publique est sollicitée
-# fréquemment (l'âge du dernier cycle reste recalculé à chaque requête, donc toujours frais).
+# Short cache of DB reads: amortizes queries if the public page is hit frequently
+# (the last-cycle age is still recomputed on each request, so it stays fresh).
 _CACHE_TTL_SEC = 3.0
 
 
-# Au-delà de ce délai sans cycle, on considère le bot « down » (fraîcheur du heartbeat).
+# Beyond this delay without a cycle, the bot is considered "down" (heartbeat freshness).
 def _stale_after() -> float:
     return max(60.0, config.poll_interval_sec * 3)
 
 
 def status_payload(status, events, now: datetime) -> dict:
-    """Assemble le dict de statut à partir d'une ligne `bot_status` et des events récents."""
+    """Assemble the status dict from a `bot_status` row and the recent events."""
     last = status["last_cycle_at"] if status else None
     age = (now - last).total_seconds() if last else None
     return {
@@ -133,7 +133,7 @@ async def _build_payload(app: web.Application) -> dict:
 
 
 async def _read_cached(app: web.Application):
-    """Lit (status, events) depuis la DB, avec un cache TTL pour limiter la charge."""
+    """Read (status, events) from the DB, with a TTL cache to limit load."""
     cache = app["cache"]
     now = time.monotonic()
     if cache["rows"] is None or now - cache["at"] > _CACHE_TTL_SEC:
@@ -147,7 +147,7 @@ async def _read_cached(app: web.Application):
 
 
 async def _on_startup(app: web.Application) -> None:
-    # Rôle read-only dédié si fourni (moindre privilège) ; sinon le DSN principal.
+    # Dedicated read-only role if provided (least privilege); otherwise the main DSN.
     db = Database(config.web_pg_dsn or config.pg_dsn)
     await db.connect()
     app["db"] = db
@@ -168,8 +168,8 @@ def make_app() -> web.Application:
 
 
 def main() -> None:
-    if not config.pg_dsn:
-        raise SystemExit("PG_DSN requis pour la page de statut")
+    if not (config.web_pg_dsn or config.pg_dsn):
+        raise SystemExit("PG_DSN (or WEB_PG_DSN) is required for the status page")
     web.run_app(make_app(), host=config.web_host, port=config.web_port)
 
 

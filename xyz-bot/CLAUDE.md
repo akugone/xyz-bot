@@ -1,80 +1,99 @@
-# CLAUDE.md — Contexte projet : Bot d'alertes « deployer xyz » (Hyperliquid HIP-3)
+# CLAUDE.md — project context: "xyz deployer" alert bot (Hyperliquid HIP-3)
 
-> Fichier de contexte lu automatiquement par Claude Code. Il condense le SPEC complet
-> (`../xyz-deployer-bot-SPEC.md`) + les décisions tranchées avec fb. Si un détail manque,
-> se référer au SPEC et à `../concepts-hyperliquid-xyz.md`.
+> Context file read automatically by Claude Code. It condenses the full spec
+> (`../xyz-deployer-bot-SPEC.md`) + the decisions made. If a detail is missing,
+> refer to the spec and `../learning/concepts-hyperliquid-xyz.md`.
 
-## But du projet
-Bot Telegram qui **notifie en quasi-temps-réel les changements de configuration** du DEX de perps `xyz` (trade.xyz) sur Hyperliquid. Lecture seule de l'API + diff d'état + ping Telegram. **Aucune** signature de transaction, **aucun** ordre de trading.
+## Goal
+Telegram bot that **notifies, in near real-time, configuration changes** of the `xyz` perp DEX
+(trade.xyz) on Hyperliquid. Read-only API access + state diff + Telegram ping. **No** transaction
+signing, **no** trading orders.
 
-**Audience** : retail + groupes Telegram de la communauté (PAS les market makers, déjà équipés). Outil public. Cas d'usage phare : les traders « snipent » les hausses d'OI cap.
+**Audience**: retail + community Telegram groups (NOT market makers, already equipped). Public
+tool. Flagship use case: traders "snipe" OI cap increases.
 
-## Faits clés (confirmés)
-- Deployer xyz : `0x88806a71D74ad0a510b350545C9aE490912F0888` (mainnet). Ce n'est **pas** un contrat EVM à ABI — le deployer signe des actions L1 ; on ne peut pas les lire directement.
-- **Donc on poll l'état via l'info API REST et on diff entre deux snapshots.** Pas de WebSocket (confirmé fb).
-- API : `POST https://api.hyperliquid.xyz/info`, `Content-Type: application/json`, paramètre `"dex": "xyz"`. Coins préfixés (`xyz:NVDA`…).
-- **Sub-deployers : il en existe.** → on surveille par diff d'état (agnostique à l'adresse-auteur), pas besoin de lister les adresses.
-- **Transitions de marge** : sens unique `strictIsolated → noCross → normal (cross)`, jamais en arrière. Le bot doit détecter le passage vers cross aussi.
+## Key facts (confirmed)
+- xyz deployer: `0x88806a71D74ad0a510b350545C9aE490912F0888` (mainnet). It is **not** an EVM
+  contract with an ABI — the deployer signs L1 actions; they can't be read directly.
+- **So we poll state via the REST info API and diff between two snapshots.** No WebSocket.
+- API: `POST https://api.hyperliquid.xyz/info`, `Content-Type: application/json`, param
+  `"dex": "xyz"`. Coins are prefixed (`xyz:NVDA`…).
+- **Sub-deployers exist.** → we monitor by state diff (agnostic to the signing address); no need
+  to list addresses.
+- **Margin transitions**: one-way `strictIsolated → noCross → normal (cross)`, never backwards.
+  The bot must also detect the move to cross.
 
-## Le concept central : les snapshots
-Le deployer n'expose aucun flux d'events. On détecte les changements en comparant l'état courant au précédent.
-- **Snapshot** = photo figée de la config du dex à un instant T, par coin.
-- **Champs suivis** (par coin) : `max_leverage`, `margin_mode`, `margin_table_id`, `oi_cap`, `is_listed`, `is_halted`, `funding_mult`, `growth_mode` ; + `total_oi_cap` au niveau dex.
-- **Exclure `oraclePx`/`markPx`** du diff (maj toutes les ~3 s = bruit).
-- **Persister en Postgres** (pas juste en mémoire) : pour diff, anti-doublon, et survie aux redémarrages.
-- **Premier run** : pas de snapshot précédent → stocker la baseline en silence (seed), ne PAS tout pinger comme « nouveau ». Les alertes démarrent au 2e cycle.
+## Core concept: snapshots
+The deployer exposes no event feed. We detect changes by comparing current vs previous state.
+- **Snapshot** = frozen photo of the dex config at time T, per coin.
+- **Tracked fields** (per coin): `max_leverage`, `margin_mode`, `margin_table_id`, `oi_cap`,
+  `is_listed`, `is_halted`, `funding_mult`, `growth_mode`; + `total_oi_cap` at the dex level.
+- **Exclude `oraclePx`/`markPx`** from the diff (updated every ~3s = noise).
+- **Persist in Postgres** (not just in memory): for diffing, dedup, and surviving restarts.
+- **First run**: no previous snapshot → store the baseline silently (seed), do NOT ping
+  everything as "new". Alerts start from the second cycle.
 
-## Boucle (daemon, PAS un cron)
+## Loop (daemon, NOT a cron)
 ```
-loop toutes les N s (cible 2–5 s) :
-  1. fetch  : POST /info  (meta, perpDexLimits [, metaAndAssetCtxs]) dex="xyz"
-  2. normalize : snapshot par coin
-  3. diff   : vs dernier snapshot en base (ignorer prix)
-  4. si delta : event typé → ping Telegram (dedup_key anti-doublon)
-  5. persister le nouveau snapshot
+loop every N s (target 2–5 s):
+  1. fetch     POST /info  (meta, perpDexLimits) dex="xyz"
+  2. normalize per-coin snapshot
+  3. diff      vs the last snapshot in DB (ignore prices)
+  4. on delta  typed event → Telegram ping (dedup_key prevents duplicates)
+  5. persist   the new snapshot + heartbeat
   6. sleep N s
 ```
-Tourne en daemon sous **systemd** (`Restart=always`) sur une micro VM AWS (fournie par fb). Postgres fournie par fb.
+Runs as a daemon under **systemd** (`Restart=always`) on a Hostinger VPS with a local Postgres.
 
-## Endpoints à utiliser
-- `perpDexLimits` (dex="xyz") → `totalOiCap`, `coinToOiCap` (les OI caps, donnée n°1).
-- `meta` (dex="xyz") → `universe[]` : `name, maxLeverage, marginTableId, marginMode, onlyIsolated, growthMode` + `marginTables[]`.
-- `metaAndAssetCtxs` (dex="xyz") → ctx live : `openInterest`, prix, funding (optionnel pour OI réel vs cap).
-- `perpsAtOpenInterestCap` (dex="xyz") → perps collés au cap (signal pré-increase, optionnel).
+## Endpoints used
+- `perpDexLimits` (dex="xyz") → `totalOiCap`, `coinToOiCap` (the OI caps, data point #1).
+- `meta` (dex="xyz") → `universe[]`: `name, maxLeverage, marginTableId, marginMode, onlyIsolated,
+  growthMode` + `marginTables[]`.
 
-## Mapping event → champ diffé
+## Event → diffed field mapping
 - OI cap → `perpDexLimits.coinToOiCap`, `totalOiCap`
-- Mode de marge → `meta.universe[].marginMode` (capter aussi → `normal`/cross)
-- Levier → `meta.universe[].maxLeverage` (+ `marginTables[]`)
-- Nouveau marché → nouvelle entrée dans `meta.universe[]`
-- Halt/reprise → **à confirmer en M1** (champ de statut côté API, sinon déduire de `isDelisted`/disparition de ctx)
+- Margin mode → `meta.universe[].marginMode` (also catch → `normal`/cross)
+- Leverage → `meta.universe[].maxLeverage`
+- New market → new entry in `meta.universe[]`
+- Halt/resume → mechanism unconfirmed (no explicit API field observed; `isHalted` read defensively)
 
 ## Stack & conventions
-- Python 3.11+, `httpx` (async), `asyncpg` ou `psycopg`, `python-dotenv`.
-- Config par variables d'env (voir `.env.example`). Secrets jamais commités.
-- Code dans `src/`, schéma SQL dans `db/schema.sql`, unit systemd dans `deploy/`.
-- Log structuré + heartbeat. Backoff sur erreur API. Respecter les rate limits (à valider).
+- Python 3.11+, `httpx` (async), `asyncpg`, `python-dotenv`, `aiohttp` (status page).
+- Config via env vars (see `.env.example`). Secrets never committed.
+- Code in `src/`, SQL schema in `db/schema.sql`, systemd units in `deploy/`.
+- Structured logging + heartbeat. Backoff on API error.
 
-## Milestones (état)
-- **M0 Cadrage** : ✅ (events, audience, REST, sub-deployers tranchés). Reste : canal Telegram exact, latence, rate limits, accès DB/VM.
-- **M1 Lecture** : ✅ client info API + snapshot lisible (93 coins) + tests (`tests/`, 8 verts). Hébergement cible tranché : **VPS Hostinger** (pas l'AWS de fb).
-  - **Découverte M1 — marginMode** : le champ `marginMode` n'est présent dans `meta.universe[]` que pour les marchés isolés (`strictIsolated`/`noCross`, avec `onlyIsolated:true`). Pour un marché cross (`normal`), il est **absent**. → on normalise `absent → "normal"` dans `snapshot._margin_mode()` pour que le diff capte la transition vers cross.
-  - **Découverte M1 — halt** : aucun champ de halt explicite dans `meta` ni `metaAndAssetCtxs`. Seul `isDelisted` existe (delisting permanent ≠ halt temporaire). Le flag `isHalted` n'apparaît probablement que quand un marché est halté (lecture défensive déjà en place). **À confirmer sur un vrai halt avant M2.**
-- **M2 Diff** : ✅ moteur de diff `src/events.py` (events typés + `dedup_key` + seed silencieux), boucle daemon en mémoire (`run_loop`), 12 tests verts, validé en live. **Persistance Postgres : à brancher** (étape suivante — remplacer le `prev` en mémoire de `run_loop` par load/save snapshot en base).
-- **M2-bis Persistance** : ✅ `src/db.py` (asyncpg) — load/save snapshot + `record_new_events` (`ON CONFLICT (dedup_key) DO NOTHING`, renvoie les inédits). `run_loop` charge la baseline depuis Postgres (seed seulement si base vide), persiste à chaque cycle. Fallback mémoire si `PG_DSN` absent. 5 tests d'intégration (25 au total), validé en live (baseline survit au redémarrage).
-- **M3 Notifications** : ✅ `src/messages.py` (templates SPEC §7) + `src/telegram.py` (`TelegramNotifier`, dry-run intégré). `run_loop` envoie chaque event inédit puis `mark_notified`. 13 tests (38 au total). **Envoi réel validé** via bot `@tradexyz_alerts_bot` (token + chat_id dans `.env` local, non commité). Cible actuelle = chat privé de test ; à terme = canal de broadcast.
-- **M4 Daemon & déploiement** : ✅ **déployé en prod** sur VPS Hostinger `217.65.145.163` (Ubuntu 24.04). Service systemd `xyz-bot` actif + enabled (boot), Postgres 16 locale (base `xyzbot`, user `xyzbot`), code dans `/opt/xyz-bot` (venv + `.env` chmod 600). Envoi réel Telegram actif. Mise à jour : `rsync` du dossier `xyz-bot/` puis `systemctl restart xyz-bot`. Logs : `journalctl -u xyz-bot -f`.
-- **Page de statut publique** : ✅ service web séparé `src/web.py` (aiohttp, lecture seule Postgres) → `GET /` (HTML statut + dernières alertes, auto-refresh 30s) et `GET /status.json`. Heartbeat écrit en base par le daemon (`bot_status`) à chaque cycle ; up/down déduit de la fraîcheur. Service systemd `xyz-bot-web` (port 8080). En prod : http://217.65.145.163:8080/. Sécurité : rôle Postgres **read-only** dédié (`WEB_PG_DSN`, user `xyzbot_ro`), cache lecture 3 s, units systemd durcies (`SystemCallFilter=@system-service`, etc.). Pas de domaine/HTTPS pour l'instant (IP brute) ; Caddy à ajouter le jour d'un domaine.
-- **M5 Durcissement** : ⏳ en cours. ✅ rate limits vérifiés (1200 poids/min/IP, 40/cycle → ~40% à 5s, plancher ~3s ; cf. `ROADMAP.md`). ✅ alerte **API down/recovered** sur transition (seuil `API_DOWN_THRESHOLD`, vers `TELEGRAM_ADMIN_CHAT_ID` = chat privé, pas le canal public). Reste : test sur un vrai changement de config, confirmation mécanisme halt. Suite détaillée dans `ROADMAP.md`.
-- **M2 Persistance & diff** : schéma + normalisation + moteur de diff.
-- **M3 Notifications** : Telegram Bot API + templates + dedup.
-- **M4 Daemon & déploiement** : boucle async + systemd + SSH.
-- **M5 Durcissement** : rate limits, reconnections, alerte si API down, tests.
+## Milestones (state)
+- **M1 Read** ✅ — info API client + readable snapshot (93 coins) + tests.
+  - **Finding — marginMode**: `marginMode` only appears in `meta.universe[]` for isolated markets
+    (`strictIsolated`/`noCross`, with `onlyIsolated:true`). For a cross market (`normal`) it is
+    **absent** → normalized `absent → "normal"` in `snapshot._margin_mode()` so the diff catches
+    the move to cross.
+  - **Finding — halt**: no explicit halt field in `meta` or `metaAndAssetCtxs`. Only `isDelisted`
+    exists (permanent delisting ≠ temporary halt). `isHalted` likely only appears when a market is
+    halted (read defensively). To confirm on a real halt.
+- **M2 Diff & persistence** ✅ — `src/events.py` (typed events + `dedup_key` + silent seed) and
+  `src/db.py` (asyncpg, load/save snapshot, `record_new_events` with `ON CONFLICT DO NOTHING`).
+  `run_loop` loads the baseline from Postgres; in-memory fallback if `PG_DSN` is absent.
+- **M3 Notifications** ✅ — `src/messages.py` (templates) + `src/telegram.py` (`TelegramNotifier`,
+  dry-run). Live sending validated via `@tradexyz_alerts_bot` to the broadcast channel. Public
+  messages in English.
+- **M4 Daemon & deploy** ✅ — hardened `run_loop` (backoff, heartbeat, graceful SIGTERM). **In
+  production** on Hostinger VPS `217.65.145.163` (Ubuntu 24.04), systemd `xyz-bot` active +
+  enabled, local Postgres 16. Update: `rsync` of `xyz-bot/` then `systemctl restart`.
+- **Public status page** ✅ — separate service `src/web.py` (aiohttp, read-only DB role
+  `WEB_PG_DSN`) → `GET /` (HTML) + `/status.json`. Daemon writes a `bot_status` heartbeat each
+  cycle. systemd `xyz-bot-web` (port 8080), http://217.65.145.163:8080/.
+- **M5 Hardening** ⏳ — rate limits verified (1200 weight/min/IP, ~40% at 5s; floor ~3s).
+  **API down/recovered** alert on transition (`API_DOWN_THRESHOLD` → `TELEGRAM_ADMIN_CHAT_ID`,
+  not the public channel). Remaining: test on a real config change, confirm halt mechanism.
+  Details in `../ROADMAP.md`.
 
-## Démarrage rapide (dev)
+## Quickstart (dev)
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # remplir les valeurs
-python -m src.main     # M1 : doit fetch + afficher un snapshot du dex xyz
+pip install -r requirements-dev.txt
+cp .env.example .env   # fill in the values
+python -m src.main     # daemon: fetch -> diff -> notify -> persist
+python -m src.web      # status page (separate service)
 ```

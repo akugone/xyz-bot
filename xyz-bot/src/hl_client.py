@@ -1,9 +1,9 @@
-"""Client de lecture de l'info API Hyperliquid (POST /info).
+"""Reader client for the Hyperliquid info API (POST /info).
 
-Lecture seule. Tous les appels sont des POST JSON vers le même endpoint,
-différenciés par le champ "type". Pour le dex builder-deployed, on passe "dex".
+Read-only. All calls are JSON POSTs to the same endpoint, distinguished by the "type"
+field. For the builder-deployed dex, we pass "dex".
 
-Doc : https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals
+Docs: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals
 """
 from __future__ import annotations
 
@@ -26,18 +26,16 @@ class HyperliquidClient:
         resp.raise_for_status()
         return resp.json()
 
-    # --- endpoints cœur ---
-
     async def get_meta(self, dex: str) -> dict[str, Any]:
-        """universe[] (levier, marginMode, marginTableId...) + marginTables[]."""
+        """universe[] (leverage, marginMode, marginTableId...) + marginTables[]."""
         return await self._post({"type": "meta", "dex": dex})
 
     async def get_perp_dex_limits(self, dex: str) -> dict[str, Any]:
-        """totalOiCap, oiSzCapPerPerp, maxTransferNtl, coinToOiCap (les OI caps)."""
+        """totalOiCap, oiSzCapPerPerp, maxTransferNtl, coinToOiCap (the OI caps)."""
         return await self._post({"type": "perpDexLimits", "dex": dex})
 
-    # Endpoints d'appoint non encore utilisés (metaAndAssetCtxs, perpsAtOpenInterestCap)
-    # retirés volontairement : à réintroduire si on branche le signal pré-OI-increase (M6).
+    # Supplementary endpoints (metaAndAssetCtxs, perpsAtOpenInterestCap) intentionally not
+    # included: reintroduce them if we wire the pre-OI-increase signal (M6).
 
     async def aclose(self) -> None:
         await self._client.aclose()

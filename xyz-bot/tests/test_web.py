@@ -1,4 +1,4 @@
-"""Tests M-status : assemblage du payload de statut + rendu HTML (purs, sans DB ni serveur)."""
+"""Status payload assembly + HTML rendering tests (pure, no DB and no server)."""
 from datetime import datetime, timedelta, timezone
 
 from src.web import render_html, status_payload
@@ -63,7 +63,7 @@ def test_render_html_offline_and_empty():
 
 
 def test_render_html_escapes_values():
-    """Pas d'injection HTML via les valeurs d'event."""
+    """No HTML injection via event values."""
     ev = _event(NOW, coin="<script>", new="<b>x</b>")
     html = render_html(status_payload(_status(NOW), [ev], NOW))
     assert "<script>" not in html

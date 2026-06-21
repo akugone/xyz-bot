@@ -1,53 +1,51 @@
 # Roadmap — xyz deployer bot
 
-> Feuille de route vivante. Mise à jour au fil de l'eau. Voir aussi `DEBRIEF-FB.md`
-> (points à confirmer avec fb), `xyz-deployer-bot-SPEC.md` (spec), `xyz-bot/deploy/OPS.md`.
-> Dernière mise à jour : **2026-06-21**.
+> Living roadmap, updated as we go. See also `HANDOVER.md` (status & open questions),
+> `xyz-deployer-bot-SPEC.md` (spec), `xyz-bot/deploy/OPS.md` (operations).
+> Last updated: **2026-06-21**.
 
 ---
 
-## ✅ Fait
+## ✅ Done
 
-- **M1 — Lecture** : client info API Hyperliquid + snapshot par coin (93 marchés).
-- **M2 — Diff + persistance** : moteur de diff (events typés, dedup), Postgres (seed silencieux, survie au restart).
-- **M3 — Notifications** : envoi Telegram sur le canal de broadcast « XYZ Deployer Alerts » (messages en **anglais**).
-- **M4 — Déploiement** : daemon durci (backoff, heartbeat, arrêt propre) en prod sur VPS Hostinger, systemd, 24/7.
-- **Page de statut publique** : http://217.65.145.163:8080/ (rôle DB read-only, cache, units durcies).
-- **Revue de code + sécu** : factorisation, dead code retiré, moindre privilège, durcissement SSH/systemd.
-- **M5 (partiel)** : rate limits vérifiés (voir ci-dessous) ; alerte **API down/recovered** vers chat admin.
-
----
-
-## 🔜 Court terme (prochaines étapes)
-
-- [ ] **Configurer le chat admin** (`TELEGRAM_ADMIN_CHAT_ID`) pour recevoir les alertes ops, et **tester l'alerte API down** (ex. couper l'accès réseau et vérifier le message).
-- [ ] **Test sur un vrai changement de config** du dex (ou simulé) → confirmer le flux bout-en-bout en conditions réelles.
-- [ ] **Confirmer le mécanisme de halt avec fb** (champ API non observé — cf. `DEBRIEF-FB.md`).
-- [ ] **Ouvrir le canal au public** (passer le canal Telegram en public) une fois validé.
-
-## 🌍 Moyen terme
-
-- [ ] **Domaine + HTTPS** sur la page de statut (Caddy, auto-TLS) → URL propre `https://status.<domaine>`.
-- [ ] **Enrichir la page** : lien d'abonnement au canal, marchés collés à leur OI cap, mini-historique.
-- [ ] **Régénérer le mot de passe root** du VPS (a transité en clair au setup).
-- [ ] **Sauvegardes** : la base est reconstructible (re-seed), mais un dump quotidien `events` (audit) serait un plus.
-
-## 🧪 Long terme / options (M6)
-
-- [ ] **Signal pré-OI-increase** : réintroduire `perpsAtOpenInterestCap` / `metaAndAssetCtxs` (OI réel vs cap).
-- [ ] **Multi-dex** : généraliser au-delà de `xyz` (le code filtre déjà par `dex`).
-- [ ] **Funding multiplier** : alimenter `funding_mult` (via `perpDexs.assetToFundingMultiplier`) si jugé utile.
-- [ ] **Second canal / verbosité** : canal MM vs public, ou filtrage par type d'event.
+- **M1 — Read**: Hyperliquid info API client + per-coin snapshot (93 markets).
+- **M2 — Diff + persistence**: diff engine (typed events, dedup), Postgres (silent seed, survives restart).
+- **M3 — Notifications**: Telegram sending to the broadcast channel "XYZ Deployer Alerts" (messages in **English**).
+- **M4 — Deployment**: hardened daemon (backoff, heartbeat, graceful shutdown) in production on a Hostinger VPS, systemd, 24/7.
+- **Public status page**: http://217.65.145.163:8080/ (read-only DB role, cache, hardened units).
+- **Code review & security**: helper dedup, dead code removed, least privilege, SSH/systemd hardening.
+- **M5 (partial)**: rate limits verified (see below); **API down/recovered** alert to the admin chat.
 
 ---
 
-## 📊 Référence — rate limits API Hyperliquid (vérifié 2026-06-21)
+## 🔜 Short term (next steps)
 
-- Limite **agrégée : 1200 de poids / minute / IP** (toutes requêtes REST confondues).
-- `meta` et `perpDexLimits` = **20 de poids chacune** (défaut des requêtes `info`).
-- **Notre conso** : 2 requêtes/cycle = 40/cycle.
-  - poll **5 s** → 12 cycles/min → **480/min (~40 %)** ✅ marge confortable (réglage actuel).
-  - poll **3 s** → 20 cycles/min → 800/min (~67 %) ✅ encore ok si on veut plus de réactivité.
-  - poll **2 s** → 30 cycles/min → 1200/min (**100 % = ne pas faire**).
-- **Conclusion** : 5 s est sûr ; **ne pas descendre sous ~3 s**. Le rate limit n'est pas un souci au réglage actuel.
-- Source : https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits
+- [ ] **Test on a real config change** of the dex (or simulated) → confirm the end-to-end flow in real conditions.
+- [ ] **Confirm the halt mechanism** with the trade.xyz team (API field not observed — see `HANDOVER.md`).
+- [ ] **Open the channel to the public** (switch the Telegram channel to public) once validated.
+
+## 🌍 Medium term
+
+- [ ] **Domain + HTTPS** for the status page (Caddy, auto-TLS) → clean URL `https://status.<domain>`.
+- [ ] **Enrich the page**: channel subscribe link, markets sitting at their OI cap, mini history.
+- [ ] **Backups**: the DB is reconstructible (re-seed), but a daily `events` dump (audit trail) would be a plus.
+
+## 🧪 Long term / options (M6)
+
+- [ ] **Pre-OI-increase signal**: reintroduce `perpsAtOpenInterestCap` / `metaAndAssetCtxs` (real OI vs cap).
+- [ ] **Multi-dex**: generalize beyond `xyz` (the code already filters by `dex`).
+- [ ] **Funding multiplier**: populate `funding_mult` (via `perpDexs.assetToFundingMultiplier`) if useful.
+- [ ] **Second channel / verbosity**: MM vs public channel, or filtering by event type.
+
+---
+
+## 📊 Reference — Hyperliquid API rate limits (verified 2026-06-21)
+
+- Aggregated limit: **1200 weight / minute / IP** (across all REST requests).
+- `meta` and `perpDexLimits` = **20 weight each** (default for `info` requests).
+- **Our usage**: 2 requests/cycle = 40/cycle.
+  - poll **5s** → 12 cycles/min → **480/min (~40%)** ✅ comfortable margin (current setting).
+  - poll **3s** → 20 cycles/min → 800/min (~67%) ✅ still fine for more reactivity.
+  - poll **2s** → 30 cycles/min → 1200/min (**100% = do not**).
+- **Conclusion**: 5s is safe; **do not go below ~3s**. Rate limiting is not a concern at the current setting.
+- Source: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits

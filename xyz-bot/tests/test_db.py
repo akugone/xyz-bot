@@ -1,11 +1,10 @@
-"""Tests M2-bis : persistance Postgres (intégration).
+"""Postgres persistence tests (integration).
 
-Nécessite une Postgres de test. DSN via `TEST_PG_DSN` (défaut : base locale `xyzbot_test`).
-Si la base n'est pas joignable, les tests sont SKIPPÉS (la suite reste verte sans DB).
+Requires a test Postgres. DSN via `TEST_PG_DSN` (default: local db `xyzbot_test`).
+If the database is unreachable, the tests are SKIPPED (the suite stays green without a DB).
 
-Note event loop : asyncpg lie son pool à la boucle où il est créé. On exécute donc
-chaque test dans UN SEUL `asyncio.run` (connexion + travail + fermeture), sans partager
-le pool entre boucles.
+Event-loop note: asyncpg binds its pool to the loop it was created in. So each test runs in
+a SINGLE `asyncio.run` (connect + work + close), without sharing the pool across loops.
 """
 import asyncio
 import os
@@ -34,13 +33,13 @@ def _snapshot(oi_hood="50000000.0", total="7000000000.0") -> Snapshot:
 
 
 def run_db_test(scenario):
-    """Lance `scenario(db)` dans une base fraîche, ou skip si Postgres indisponible."""
+    """Run `scenario(db)` against a fresh DB, or skip if Postgres is unavailable."""
     async def main():
         db = Database(TEST_DSN)
         try:
             await db.connect()
         except (OSError, asyncpg.PostgresError) as e:
-            pytest.skip(f"Postgres de test indisponible: {e}")
+            pytest.skip(f"test Postgres unavailable: {e}")
         try:
             await db.init_schema()
             await db.pool.execute("TRUNCATE market_state, dex_state, events")
@@ -67,7 +66,7 @@ def test_save_then_load_roundtrip():
         hood = loaded.coins["xyz:HOOD"]
         assert hood.max_leverage == 10
         assert hood.margin_mode == "noCross"
-        assert hood.oi_cap == "50000000.0"   # str préservée après aller-retour NUMERIC
+        assert hood.oi_cap == "50000000.0"   # str preserved across the NUMERIC round-trip
         assert hood.is_listed is True
         assert hood.is_halted is None
     run_db_test(scenario)
@@ -76,10 +75,10 @@ def test_save_then_load_roundtrip():
 def test_save_is_upsert_not_duplicate():
     async def scenario(db):
         await db.save_snapshot(_snapshot(oi_hood="50000000.0"))
-        await db.save_snapshot(_snapshot(oi_hood="99000000.0"))  # re-save, valeur modifiée
+        await db.save_snapshot(_snapshot(oi_hood="99000000.0"))  # re-save, changed value
         loaded = await db.load_snapshot("xyz")
-        assert len(loaded.coins) == 2  # pas de doublon de ligne
-        assert loaded.coins["xyz:HOOD"].oi_cap == "99000000.0"  # dernière valeur gagne
+        assert len(loaded.coins) == 2  # no duplicate row
+        assert loaded.coins["xyz:HOOD"].oi_cap == "99000000.0"  # last value wins
     run_db_test(scenario)
 
 
@@ -92,30 +91,30 @@ def test_record_new_events_is_idempotent():
         assert [e.event_type for e in events] == [OI_CAP_CHANGE]
 
         first = await db.record_new_events(events)
-        assert len(first) == 1            # inédit → inséré
+        assert len(first) == 1            # fresh → inserted
         second = await db.record_new_events(events)
-        assert second == []               # même dedup_key → rien inséré (anti-doublon)
+        assert second == []               # same dedup_key → nothing inserted (anti-duplicate)
     run_db_test(scenario)
 
 
 def test_full_cycle_seed_then_change():
-    """Reproduit la boucle : seed silencieux, puis détection + persistance d'un changement."""
+    """Reproduces the loop: silent seed, then detect + persist a change."""
     async def scenario(db):
-        # cycle 1 : pas de baseline → seed (aucun event), on persiste
+        # cycle 1: no baseline → seed (no event), persist
         prev = await db.load_snapshot("xyz")
         assert prev is None
         base = _snapshot(oi_hood="50000000.0")
         assert diff(prev, base) == []
         await db.save_snapshot(base)
 
-        # cycle 2 : OI cap augmente → 1 event inédit
+        # cycle 2: OI cap increases → 1 fresh event
         prev = await db.load_snapshot("xyz")
         changed = _snapshot(oi_hood="100000000.0")
         new_events = await db.record_new_events(diff(prev, changed))
         await db.save_snapshot(changed)
         assert [e.event_type for e in new_events] == [OI_CAP_CHANGE]
 
-        # cycle 3 : plus de changement → aucun event
+        # cycle 3: no more change → no event
         prev = await db.load_snapshot("xyz")
         assert await db.record_new_events(diff(prev, _snapshot(oi_hood="100000000.0"))) == []
     run_db_test(scenario)

@@ -1,15 +1,15 @@
-"""Moteur de diff : compare deux snapshots et produit des events typés.
+"""Diff engine: compares two snapshots and produces typed events.
 
-Cœur de M2. Aucune dépendance à Postgres ni à Telegram — pur calcul sur des
-`Snapshot`, donc entièrement testable en mémoire. La persistance (M2 bis) et la
-notification (M3) consommeront la liste d'`Event` produite ici.
+Heart of M2. No dependency on Postgres or Telegram — pure computation over `Snapshot`
+objects, so fully testable in memory. Persistence (db) and notification (telegram) consume
+the list of `Event` produced here.
 
-Règles clés (cf. CLAUDE.md / SPEC) :
-  - **Seed silencieux** : si `prev is None` (1er run, pas de baseline), on ne
-    génère AUCUN event. On se contente de mémoriser/persister le snapshot courant.
-  - On ignore les prix (oraclePx/markPx) : ils ne sont même pas dans le snapshot.
-  - Le `marginMode` est déjà normalisé (`absent → "normal"`) côté snapshot, donc
-    le passage en cross apparaît comme `noCross → normal`.
+Key rules (see CLAUDE.md / SPEC):
+  - **Silent seed**: if `prev is None` (first run, no baseline), produce NO event. We just
+    record/persist the current snapshot.
+  - We ignore prices (oraclePx/markPx): they aren't even in the snapshot.
+  - `marginMode` is already normalized (`absent → "normal"`) in the snapshot, so the move to
+    cross shows up as `noCross → normal`.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from .snapshot import CoinState, Snapshot
 from .util import none_or_str
 
-# --- types d'events (alignés sur events.event_type en base) ---
+# --- event types (aligned with events.event_type in the DB) ---
 NEW_MARKET = "new_market"
 OI_CAP_CHANGE = "oi_cap_change"
 TOTAL_OI_CAP_CHANGE = "total_oi_cap_change"
@@ -40,39 +40,38 @@ class Event:
 
     @property
     def dedup_key(self) -> str:
-        """Clé d'idempotence anti-doublon : sha256(dex|coin|type|new_value).
+        """Idempotency key: sha256(dex|coin|type|new_value).
 
-        Deux détections identiques (ex. on revoit le même cap après redémarrage)
-        produisent la même clé → `INSERT ... ON CONFLICT DO NOTHING` en base, donc
-        un seul ping Telegram.
+        Two identical detections (e.g. seeing the same cap again after a restart) produce the
+        same key → `INSERT ... ON CONFLICT DO NOTHING` in the DB, hence a single Telegram ping.
         """
         raw = f"{self.dex}|{self.coin or ''}|{self.event_type}|{self.new_value or ''}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
 
 def _halted(c: CoinState) -> bool:
-    """État de halt normalisé en booléen (is_halted absent/None = non halté)."""
+    """Halt state normalized to a boolean (is_halted absent/None = not halted)."""
     return bool(c.is_halted)
 
 
 def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
-    """Liste des changements entre `prev` et `curr`. `prev is None` → seed (aucun event)."""
+    """List of changes between `prev` and `curr`. `prev is None` → seed (no event)."""
     if prev is None:
-        return []  # seed silencieux : on ne pinge pas la baseline initiale
+        return []  # silent seed: don't ping the initial baseline
 
     events: list[Event] = []
     dex = curr.dex
 
-    # --- niveau dex : plafond d'OI global ---
+    # --- dex level: global OI cap ---
     if prev.total_oi_cap != curr.total_oi_cap:
         events.append(Event(dex, None, TOTAL_OI_CAP_CHANGE, prev.total_oi_cap, curr.total_oi_cap))
 
-    # --- niveau coin ---
+    # --- coin level ---
     for coin, c in curr.coins.items():
         p = prev.coins.get(coin)
 
         if p is None:
-            # Coin présent maintenant, absent avant → nouveau marché listé.
+            # Coin present now, absent before → newly listed market.
             new_val = f"lev={c.max_leverage};mode={c.margin_mode};oi_cap={c.oi_cap}"
             events.append(Event(dex, coin, NEW_MARKET, None, new_val))
             continue
@@ -87,13 +86,13 @@ def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
             events.append(Event(dex, coin, LEVERAGE_CHANGE,
                                 none_or_str(p.max_leverage), none_or_str(c.max_leverage)))
 
-        # halt / reprise — mécanisme API à confirmer avec fb (cf. DEBRIEF-FB.md).
-        # Implémenté de façon provisoire en traitant is_halted absent/None = non halté.
+        # halt / resume — API mechanism to confirm (see HANDOVER.md).
+        # Implemented provisionally by treating is_halted absent/None = not halted.
         if _halted(p) != _halted(c):
             etype = HALT if _halted(c) else UNHALT
             events.append(Event(dex, coin, etype, _halt_label(p), _halt_label(c)))
 
-        # delisting : marché qui passe listé → delisté (is_listed True → False).
+        # delisting: market that goes listed → delisted (is_listed True → False).
         if p.is_listed and not c.is_listed:
             events.append(Event(dex, coin, DELISTED, "listed", "delisted"))
 

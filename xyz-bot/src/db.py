@@ -1,16 +1,16 @@
-"""Persistance Postgres (asyncpg) : snapshots + journal d'events.
+"""Postgres persistence (asyncpg): snapshots + event journal.
 
-Rôle dans l'archi :
-  - `load_snapshot(dex)` au démarrage → le `prev` du diff survit aux redémarrages.
-    Renvoie `None` si aucune baseline en base (→ seed silencieux au 1er run jamais).
-  - `save_snapshot(snap)` à chaque cycle → met à jour l'état courant (upsert).
+Role in the architecture:
+  - `load_snapshot(dex)` on startup → the diff's `prev` survives restarts.
+    Returns `None` if there is no baseline (→ a one-time silent seed on the first run).
+  - `save_snapshot(snap)` every cycle → updates the current state (upsert).
   - `record_new_events(events)` → `INSERT ... ON CONFLICT (dedup_key) DO NOTHING`,
-    renvoie UNIQUEMENT les events réellement insérés. C'est l'idempotence anti-doublon :
-    M3 ne notifiera que ceux-là (un même changement revu après redémarrage = clé déjà
-    présente = pas de second ping).
+    returns ONLY the events actually inserted. This is the anti-duplicate idempotency:
+    only those get notified (the same change seen again after a restart = key already
+    present = no second ping).
 
-Types : `oi_cap` / `total_oi_cap` / `funding_mult` sont des NUMERIC en base ; on les
-manipule en `str` côté snapshot, donc on convertit via `Decimal` à l'aller et au retour.
+Types: `oi_cap` / `total_oi_cap` / `funding_mult` are NUMERIC in the DB; we handle them as
+`str` in the snapshot, so we convert via `Decimal` on the way in and out.
 """
 from __future__ import annotations
 
@@ -42,17 +42,17 @@ class Database:
     @property
     def pool(self) -> asyncpg.Pool:
         if self._pool is None:
-            raise RuntimeError("Database non connectée — appeler connect() d'abord")
+            raise RuntimeError("Database not connected — call connect() first")
         return self._pool
 
     async def init_schema(self) -> None:
-        """Crée les tables si absentes (idempotent : schema.sql utilise IF NOT EXISTS)."""
+        """Create tables if missing (idempotent: schema.sql uses IF NOT EXISTS)."""
         await self.pool.execute(SCHEMA_PATH.read_text())
 
     # --- snapshots ---
 
     async def load_snapshot(self, dex: str) -> Snapshot | None:
-        """Reconstruit le dernier snapshot persisté, ou None s'il n'y a pas de baseline."""
+        """Rebuild the last persisted snapshot, or None if there is no baseline."""
         rows = await self.pool.fetch(
             "SELECT coin, max_leverage, margin_mode, margin_table_id, oi_cap, "
             "is_listed, is_halted, funding_mult, growth_mode "
@@ -60,7 +60,7 @@ class Database:
             dex,
         )
         if not rows:
-            return None  # pas de baseline → le diff fera un seed silencieux
+            return None  # no baseline → the diff will do a silent seed
 
         dex_row = await self.pool.fetchrow(
             "SELECT total_oi_cap FROM dex_state WHERE dex = $1", dex
@@ -81,7 +81,7 @@ class Database:
         return snap
 
     async def save_snapshot(self, snap: Snapshot) -> None:
-        """Upsert de l'état dex + de chaque coin (transaction)."""
+        """Upsert the dex state + each coin (transaction)."""
         async with self.pool.acquire() as conn, conn.transaction():
             await conn.execute(
                 "INSERT INTO dex_state (dex, total_oi_cap, updated_at) "
@@ -109,7 +109,7 @@ class Database:
     # --- events ---
 
     async def record_new_events(self, events: list[Event]) -> list[Event]:
-        """Insère les events ; renvoie ceux RÉELLEMENT insérés (dedup_key inédit)."""
+        """Insert events; return the ones ACTUALLY inserted (fresh dedup_key)."""
         inserted: list[Event] = []
         async with self.pool.acquire() as conn:
             for ev in events:
@@ -119,16 +119,16 @@ class Database:
                     "ON CONFLICT (dedup_key) DO NOTHING RETURNING id",
                     ev.dex, ev.coin, ev.event_type, ev.old_value, ev.new_value, ev.dedup_key,
                 )
-                if row is not None:  # une ligne créée = event inédit
+                if row is not None:  # a row was created = fresh event
                     inserted.append(ev)
         return inserted
 
-    # --- heartbeat / statut (alimente la page publique) ---
+    # --- heartbeat / status (feeds the public page) ---
 
     async def record_heartbeat(
         self, dex: str, started_at: datetime, markets_count: int, errors: int
     ) -> None:
-        """Met à jour la ligne de statut du bot (upsert) — appelé à chaque cycle."""
+        """Update the bot's status row (upsert) — called every cycle."""
         await self.pool.execute(
             "INSERT INTO bot_status (dex, started_at, last_cycle_at, markets_count, consecutive_errors) "
             "VALUES ($1, $2, now(), $3, $4) "
@@ -139,7 +139,7 @@ class Database:
         )
 
     async def get_status(self, dex: str) -> asyncpg.Record | None:
-        """Ligne de statut courante (ou None si le bot n'a jamais tourné)."""
+        """Current status row (or None if the bot has never run)."""
         return await self.pool.fetchrow(
             "SELECT dex, started_at, last_cycle_at, markets_count, consecutive_errors "
             "FROM bot_status WHERE dex = $1",
@@ -147,7 +147,7 @@ class Database:
         )
 
     async def recent_events(self, dex: str, limit: int = 20) -> list[asyncpg.Record]:
-        """Les `limit` derniers events détectés (les plus récents d'abord)."""
+        """The last `limit` detected events (most recent first)."""
         return await self.pool.fetch(
             "SELECT created_at, event_type, coin, old_value, new_value "
             "FROM events WHERE dex = $1 ORDER BY id DESC LIMIT $2",
@@ -155,10 +155,10 @@ class Database:
         )
 
     async def mark_notified(self, dedup_keys: list[str]) -> None:
-        """Marque `notified_at = now()` pour les events effectivement envoyés.
+        """Set `notified_at = now()` for events actually sent.
 
-        Un event inséré mais jamais marqué (notified_at NULL) = enregistré mais non
-        délivré (ex. échec d'envoi) → traçable par une requête.
+        An event inserted but never marked (notified_at NULL) = recorded but not delivered
+        (e.g. send failure) → queryable.
         """
         if not dedup_keys:
             return
