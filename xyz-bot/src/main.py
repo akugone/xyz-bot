@@ -1,15 +1,15 @@
 """Point d'entrée du daemon xyz-bot.
 
-État actuel : M1 amorcé — fetch + construction + affichage d'un snapshot.
-À compléter (voir CLAUDE.md / SPEC) :
-  - M2 : persistance Postgres + moteur de diff (avec seed silencieux au 1er run)
-  - M3 : notifications Telegram + dedup_key
-  - M4 : boucle daemon robuste (backoff, heartbeat) sous systemd
+`run_loop()` (entrée prod) : boucle résiliente fetch → diff → notif Telegram → persiste,
+avec backoff sur erreur, heartbeat et arrêt propre sur SIGTERM (systemd).
+`run_once()` : un seul cycle de lecture (debug M1).
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import signal
+import time
 
 from .config import config
 from .db import Database
@@ -21,6 +21,13 @@ from .telegram import TelegramNotifier
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("xyz-bot")
+
+
+def backoff_delay(errors: int) -> float:
+    """Délai avant le prochain cycle : poll normal si 0 erreur, sinon backoff exp. plafonné."""
+    if not errors:
+        return config.poll_interval_sec
+    return min(config.poll_interval_sec * (2 ** errors), config.error_backoff_max_sec)
 
 
 async def fetch_snapshot(client: HyperliquidClient, dex: str) -> Snapshot:
@@ -47,13 +54,47 @@ async def run_once() -> None:
         await client.aclose()
 
 
-async def run_loop() -> None:
-    """Boucle daemon : fetch → diff → persiste. Notif Telegram = M3 (encore en logs).
+async def run_cycle(
+    client: HyperliquidClient,
+    db: Database | None,
+    notifier: TelegramNotifier,
+    prev_mem: Snapshot | None,
+) -> Snapshot:
+    """Un cycle complet : fetch → diff → notifie les inédits → persiste. Renvoie le snapshot.
 
-    Persistance : si `PG_DSN` est défini, le snapshot précédent vient de Postgres
-    (survit aux redémarrages) et les events inédits sont journalisés via `dedup_key`.
-    Sinon, fallback EN MÉMOIRE (utile pour un run sans base). Dans les deux cas, au tout
-    premier run sans baseline `prev is None` → seed silencieux.
+    Le snapshot précédent vient de Postgres si `db`, sinon de `prev_mem` (fallback mémoire).
+    Au 1er run sans baseline (`prev is None`) → seed silencieux (aucune alerte).
+    """
+    snap = await fetch_snapshot(client, config.dex_name)
+    prev = await db.load_snapshot(snap.dex) if db is not None else prev_mem
+    events = diff(prev, snap)
+
+    if prev is None:
+        log.info("seed — baseline de %d coins enregistrée (aucune alerte)", len(snap.coins))
+    else:
+        new_events = await db.record_new_events(events) if db is not None else events
+        sent = []
+        for ev in new_events:
+            await notifier.send(format_event(ev))
+            sent.append(ev.dedup_key)
+        if db is not None and sent:
+            await db.mark_notified(sent)
+        if not new_events:
+            log.info("cycle ok — %d coins, aucun changement", len(snap.coins))
+
+    if db is not None:
+        await db.save_snapshot(snap)
+    return snap
+
+
+async def run_loop() -> None:
+    """Boucle daemon de prod : résiliente (backoff sur erreur), heartbeat, arrêt propre.
+
+    - **Backoff** : après une erreur, le délai croît (2×, 4×… plafonné) pour ne pas
+      marteler une API en panne ; il revient au poll normal dès qu'un cycle réussit.
+    - **Heartbeat** : ligne de log « vivant » périodique (observabilité), pas d'envoi Telegram.
+    - **Arrêt propre** : SIGTERM/SIGINT (systemd `stop`) interrompt l'attente et ferme
+      proprement client HTTP, notifier et pool Postgres.
     """
     client = HyperliquidClient()
     db = Database(config.pg_dsn) if config.pg_dsn else None
@@ -70,34 +111,39 @@ async def run_loop() -> None:
         log.warning("PG_DSN absent — persistance désactivée (état en mémoire, perdu au redémarrage)")
     log.info("notifications Telegram : %s", "DRY-RUN (logs)" if notifier.dry_run else "envoi réel")
 
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, stop.set)
+        except NotImplementedError:  # pragma: no cover — plateformes sans add_signal_handler
+            pass
+
+    errors = 0
+    last_heartbeat = time.monotonic()
+    log.info("démarrage de la boucle (poll=%ss)", config.poll_interval_sec)
+
     try:
-        while True:
+        while not stop.is_set():
             try:
-                snap = await fetch_snapshot(client, config.dex_name)
-                prev = await db.load_snapshot(snap.dex) if db is not None else prev_mem
-                events = diff(prev, snap)
-
-                if prev is None:
-                    log.info("seed — baseline de %d coins enregistrée (aucune alerte)", len(snap.coins))
-                else:
-                    new_events = await db.record_new_events(events) if db is not None else events
-                    sent = []
-                    for ev in new_events:
-                        await notifier.send(format_event(ev))
-                        sent.append(ev.dedup_key)
-                    if db is not None and sent:
-                        await db.mark_notified(sent)
-                    if not new_events:
-                        log.info("cycle ok — %d coins, aucun changement", len(snap.coins))
-
-                if db is not None:
-                    await db.save_snapshot(snap)
-                else:
-                    prev_mem = snap
+                prev_mem = await run_cycle(client, db, notifier, prev_mem)
+                errors = 0
             except Exception:  # noqa: BLE001 — résilience daemon
-                log.exception("cycle en erreur, on continue")
-            await asyncio.sleep(config.poll_interval_sec)
+                errors += 1
+                log.exception("cycle en erreur (%d consécutive[s]), backoff", errors)
+
+            now = time.monotonic()
+            if config.heartbeat_interval_sec and now - last_heartbeat >= config.heartbeat_interval_sec:
+                log.info("heartbeat — vivant, %d erreur(s) consécutive(s)", errors)
+                last_heartbeat = now
+
+            # attendre le délai (poll ou backoff), mais se réveiller aussitôt si arrêt demandé
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=backoff_delay(errors))
+            except asyncio.TimeoutError:
+                pass
     finally:
+        log.info("arrêt — fermeture des ressources")
         await client.aclose()
         await notifier.aclose()
         if db is not None:
@@ -105,5 +151,4 @@ async def run_loop() -> None:
 
 
 if __name__ == "__main__":
-    # M1 : `run_once()` (un cycle de lecture). M2 : `run_loop()` (boucle + diff en mémoire).
     asyncio.run(run_loop())

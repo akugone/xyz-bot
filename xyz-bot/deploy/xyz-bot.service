@@ -1,16 +1,34 @@
 [Unit]
-Description=xyz deployer alert bot
-After=network-online.target
+Description=xyz deployer alert bot (Hyperliquid HIP-3 -> Telegram)
+After=network-online.target postgresql.service
 Wants=network-online.target
 
 [Service]
-# Adapter les chemins au déploiement réel sur la VM
+Type=simple
+User=xyzbot
 WorkingDirectory=/opt/xyz-bot
-ExecStart=/opt/xyz-bot/.venv/bin/python -m src.main
 EnvironmentFile=/opt/xyz-bot/.env
+ExecStart=/opt/xyz-bot/.venv/bin/python -m src.main
+
+# Redémarrage auto (résilience), avec garde-fou anti-boucle d'échec
 Restart=always
 RestartSec=5
-User=xyzbot
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# Arrêt propre : on laisse au daemon le temps de fermer (SIGTERM géré dans run_loop)
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# Logs -> journald (journalctl -u xyz-bot)
+StandardOutput=journal
+StandardError=journal
+
+# Durcissement basique
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

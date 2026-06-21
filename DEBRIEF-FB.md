@@ -14,7 +14,7 @@
 | **M1 — Lecture** | ✅ | client info API + snapshot (93 coins) + 8 tests verts |
 | **M2 — Diff & persistance** | ✅ | moteur de diff + persistance Postgres (asyncpg). Baseline survit au redémarrage (seed seulement si base vide). 25 tests verts, validé en live |
 | **M3 — Notifications** | ✅ | templates + envoi Telegram, **envoi réel validé** sur le canal de broadcast « XYZ Deployer Alerts » (@tradexyz_alerts_bot, bot admin) |
-| M4 — Daemon & déploiement | ⬜ | systemd + VPS **Hostinger** |
+| **M4 — Daemon & déploiement** | ✅ (code) · ⏳ (déploiement) | boucle durcie (backoff, heartbeat, arrêt propre), unit systemd + runbook. Reste à déployer sur la VM Hostinger (en cours de provisioning) |
 | M5 — Durcissement | ⬜ | rate limits, reconnections, alerte API down |
 
 ---
@@ -53,3 +53,5 @@
 - **2026-06-21** — M2 (persistance) : `src/db.py` (asyncpg) — load/save snapshot + insertion idempotente des events. `run_loop` charge la baseline depuis Postgres. 5 tests d'intégration (25 au total). Validé en live : RUN 1 = seed (93 coins), RUN 2 = pas de seed (baseline rechargée). **M2 terminé.** Prochaine étape : M3 (Telegram).
 - **2026-06-21** — M3 (dry-run) : `src/messages.py` (templates) + `src/telegram.py` (envoi + dry-run) + câblage `run_loop` (envoi puis `mark_notified`). 13 tests (38 au total). Démo live dry-run OK (messages formatés conformes SPEC §7). Reste : token BotFather + chat_id pour l'envoi réel. Prochaine étape : M4 (daemon/systemd/déploiement Hostinger).
 - **2026-06-21** — M3 **terminé** : bot `@tradexyz_alerts_bot` créé, token + chat_id configurés (`.env` local non commité), envoi réel validé (2 messages reçus). Cible actuelle = chat privé de test ; à terme pointer sur le canal de broadcast. Prochaine étape : M4.
+- **2026-06-21** — Canal de broadcast « XYZ Deployer Alerts » créé + bot admin, envoi validé. Messages publics passés en **anglais** (audience internationale). 38 tests.
+- **2026-06-21** — M4 (code) : `run_loop` durci (backoff exponentiel plafonné, heartbeat, arrêt propre SIGTERM), `run_cycle` factorisé + testé, unit systemd (`deploy/xyz-bot.service`) + runbook (`deploy/DEPLOY.md`). 43 tests verts, arrêt propre SIGTERM validé en live. Reste : déployer sur la VM Hostinger (Ubuntu, en provisioning).
