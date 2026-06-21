@@ -154,6 +154,13 @@ class Database:
             dex, limit,
         )
 
+    async def list_coins(self, dex: str) -> list[str]:
+        """Names of the markets currently tracked for `dex` (alphabetical)."""
+        rows = await self.pool.fetch(
+            "SELECT coin FROM market_state WHERE dex = $1 ORDER BY coin", dex
+        )
+        return [r["coin"] for r in rows]
+
     async def mark_notified(self, dedup_keys: list[str]) -> None:
         """Set `notified_at = now()` for events actually sent.
 

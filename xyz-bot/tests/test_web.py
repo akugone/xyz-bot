@@ -93,6 +93,7 @@ class _FakeDB:
     def __init__(self):
         self.status_calls = 0
         self.events_calls = 0
+        self.coins_calls = 0
 
     async def get_status(self, dex):
         self.status_calls += 1
@@ -101,6 +102,10 @@ class _FakeDB:
     async def recent_events(self, dex, limit):
         self.events_calls += 1
         return []
+
+    async def list_coins(self, dex):
+        self.coins_calls += 1
+        return ["xyz:HOOD", "xyz:NVDA"]
 
 
 def _app(db):
@@ -137,3 +142,12 @@ def test_build_payload_uses_db_rows():
     payload = asyncio.run(web._build_payload(_app(_FakeDB())))
     assert payload["markets_count"] == 93
     assert payload["recent_events"] == []
+    assert payload["markets"] == ["xyz:HOOD", "xyz:NVDA"]
+
+
+def test_render_html_lists_tokens_in_tooltip():
+    payload = status_payload(_status(NOW), [], NOW, coins=["xyz:HOOD", "xyz:NVDA"])
+    html = render_html(payload)
+    assert "class='info'" in html or 'class="info"' in html   # info icon/tooltip present
+    assert "HOOD" in html and "NVDA" in html                   # tokens listed
+    assert "xyz:HOOD" not in html                              # dex prefix stripped

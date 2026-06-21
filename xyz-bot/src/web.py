@@ -32,14 +32,15 @@ def _stale_after() -> float:
     return max(60.0, config.poll_interval_sec * 3)
 
 
-def status_payload(status, events, now: datetime) -> dict:
-    """Assemble the status dict from a `bot_status` row and the recent events."""
+def status_payload(status, events, now: datetime, coins=()) -> dict:
+    """Assemble the status dict from a `bot_status` row, recent events, and the coin list."""
     last = status["last_cycle_at"] if status else None
     age = (now - last).total_seconds() if last else None
     return {
         "dex": config.dex_name,
         "up": bool(last) and age is not None and age < _stale_after(),
         "markets_count": status["markets_count"] if status else None,
+        "markets": list(coins),
         "consecutive_errors": status["consecutive_errors"] if status else None,
         "started_at": _iso(status["started_at"]) if status else None,
         "last_cycle_at": _iso(last),
@@ -74,6 +75,16 @@ def render_html(payload: dict) -> str:
     age = payload["last_cycle_age_sec"]
     age_txt = f"{age}s ago" if age is not None else "—"
 
+    markets = payload.get("markets") or []
+    count_txt = payload["markets_count"] if payload["markets_count"] is not None else "—"
+    # display without the "xyz:" prefix; tooltip lists all tracked tokens
+    tokens = ", ".join(html.escape(m.split(":")[-1]) for m in markets) or "—"
+    markets_card = (
+        f"<div class='k'>Markets watched <span class='info'>&#9432;"
+        f"<span class='tip'>{tokens}</span></span></div>"
+        f"<div class='v'>{count_txt}</div>"
+    )
+
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -98,13 +109,20 @@ def render_html(payload: dict) -> str:
   .tag {{ background:#1f2a44; color:#9db4ff; border-radius:5px; padding:.1rem .4rem; font-size:.75rem; }}
   .muted {{ color:#8a93a6; text-align:center; }}
   a {{ color:#9db4ff; }}
+  .info {{ position:relative; cursor:help; color:#8a93a6; margin-left:.25rem; }}
+  .info .tip {{ display:none; position:absolute; left:0; top:1.5em; z-index:10;
+    width:300px; max-width:70vw; max-height:220px; overflow-y:auto;
+    background:#0b0e14; border:1px solid #2b3650; border-radius:8px; padding:.6rem .7rem;
+    font-size:.72rem; line-height:1.6; color:#cbd5e1; font-weight:400;
+    box-shadow:0 8px 28px rgba(0,0,0,.6); }}
+  .info:hover .tip {{ display:block; }}
   footer {{ margin-top:2rem; color:#8a93a6; font-size:.8rem; }}
 </style></head>
 <body><div class="wrap">
   <h1>{dot} xyz deployer alerts — <span class="badge">{state}</span></h1>
   <div class="grid">
     <div class="card"><div class="k">Dex</div><div class="v">{html.escape(payload['dex'] or '—')}</div></div>
-    <div class="card"><div class="k">Markets watched</div><div class="v">{payload['markets_count'] if payload['markets_count'] is not None else '—'}</div></div>
+    <div class="card">{markets_card}</div>
     <div class="card"><div class="k">Last check</div><div class="v">{age_txt}</div></div>
     <div class="card"><div class="k">Errors (streak)</div><div class="v">{payload['consecutive_errors'] if payload['consecutive_errors'] is not None else '—'}</div></div>
   </div>
@@ -140,12 +158,12 @@ async def _handle_json(request: web.Request) -> web.Response:
 
 
 async def _build_payload(app: web.Application) -> dict:
-    status, events = await _read_cached(app)
-    return status_payload(status, events, datetime.now(timezone.utc))
+    status, events, coins = await _read_cached(app)
+    return status_payload(status, events, datetime.now(timezone.utc), coins)
 
 
 async def _read_cached(app: web.Application):
-    """Read (status, events) from the DB, with a TTL cache to limit load."""
+    """Read (status, events, coins) from the DB, with a TTL cache to limit load."""
     cache = app["cache"]
     now = time.monotonic()
     if cache["rows"] is None or now - cache["at"] > _CACHE_TTL_SEC:
@@ -153,6 +171,7 @@ async def _read_cached(app: web.Application):
         cache["rows"] = (
             await db.get_status(config.dex_name),
             await db.recent_events(config.dex_name, 20),
+            await db.list_coins(config.dex_name),
         )
         cache["at"] = now
     return cache["rows"]

@@ -24,7 +24,8 @@
 - **Status 🟢 ONLINE / 🔴 OFFLINE** — derived from the freshness of the bot's last cycle
   (online if a cycle happened less than ~3× the poll interval ago, i.e. < 60s).
 - **Dex** being watched (`xyz`).
-- **Markets watched** — number of monitored markets (≈ 93).
+- **Markets watched** — number of monitored markets (≈ 93). The ⓘ icon shows, on hover, the full
+  list of tracked tokens.
 - **Last check** — time since the last cycle.
 - **Errors (streak)** — current consecutive error count (0 = nominal).
 - **Latest alerts** — table of the latest detected config changes (UTC time, type, market,
@@ -37,6 +38,7 @@
   "dex": "xyz",
   "up": true,
   "markets_count": 93,
+  "markets": ["xyz:AAPL", "xyz:AMD", "..."],
   "consecutive_errors": 0,
   "started_at": "2026-06-21T18:55:36+00:00",
   "last_cycle_at": "2026-06-21T18:55:48+00:00",
@@ -51,6 +53,7 @@
 |---|---|
 | `up` | bot considered alive (heartbeat freshness) |
 | `markets_count` | markets watched at the last cycle |
+| `markets` | list of tracked market names (shown in the ⓘ tooltip) |
 | `consecutive_errors` | consecutive errors (0 = healthy) |
 | `started_at` | start of the current process |
 | `last_cycle_at` / `last_cycle_age_sec` | timestamp / age of the last cycle |
