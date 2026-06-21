@@ -46,7 +46,7 @@ xyz/
 ├── learning/                  # background study notes (Hyperliquid / HIP-3)
 └── xyz-bot/                    # the application
     ├── src/                   # config, hl_client, snapshot, events, db, messages, telegram, web, main
-    ├── tests/                 # 64 tests, ~80% coverage (core logic ~100%); DB tests skip if no DB
+    ├── tests/                 # 67 tests, ~80% coverage (core logic ~100%); DB tests skip if no DB
     ├── db/schema.sql          # market_state, dex_state, events, bot_status
     └── deploy/                # systemd units + DEPLOY.md + OPS.md
 ```

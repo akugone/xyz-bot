@@ -87,8 +87,8 @@ Runs as a daemon under **systemd** (`Restart=always`) on a Hostinger VPS with a 
   cycle. systemd `xyz-bot-web` (port 8080), http://217.65.145.163:8080/.
 - **M5 Hardening** ⏳ — rate limits verified (1200 weight/min/IP, ~40% at 5s; floor ~3s).
   **API down/recovered** alert on transition (`API_DOWN_THRESHOLD` → `TELEGRAM_ADMIN_CHAT_ID`,
-  not the public channel). Remaining: test on a real config change, confirm halt mechanism.
-  Details in `../ROADMAP.md`.
+  not the public channel). End-to-end validated on a real change (controlled baseline test).
+  `growth_mode_change` event added. Remaining: confirm halt mechanism. Details in `../ROADMAP.md`.
 
 ## Quickstart (dev)
 ```bash

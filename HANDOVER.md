@@ -18,7 +18,7 @@
 | **M4 — Daemon & deploy** | ✅ | **in production** on a Hostinger VPS (Ubuntu 24.04), systemd active + enabled at boot, local Postgres. Runs 24/7 |
 | **Public status page** | ✅ | separate web service, read-only DB role, http://217.65.145.163:8080/ |
 | **Code review & hardening** | ✅ | dedup of helpers, dead code removed, least privilege, SSH/systemd hardening |
-| **M5 — Hardening** | ⏳ | rate limits verified, API-down alert done. Remaining: test on a real config change, confirm halt mechanism |
+| **M5 — Hardening** | ⏳ | rate limits verified, API-down alert done, end-to-end validated on a real change (controlled test). Remaining: confirm the halt mechanism |
 
 ---
 
@@ -75,5 +75,8 @@
 - **2026-06-21** — Public status page added (`src/web.py`, aiohttp, read-only DB role) + SSH/systemd
   hardening + ops docs.
 - **2026-06-21** — Code review applied (cleanup, dead code removal, least privilege). M5 partial:
-  rate limits verified, API-down alert added. 64 tests green (~80% coverage; core logic ~100%,
+  rate limits verified, API-down alert added. 67 tests green (~80% coverage; core logic ~100%,
   remaining gaps are the daemon-loop orchestration and web server bootstrap, validated live).
+- **2026-06-21** — Added `growth_mode_change` event (🌱). End-to-end validated in production via a
+  controlled test: tampered the stored baseline → the next cycle fired real `oi_cap_change` +
+  `growth_mode_change` alerts to the channel, then self-healed (no duplicates).

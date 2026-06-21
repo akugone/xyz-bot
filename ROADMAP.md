@@ -14,13 +14,13 @@
 - **M4 — Deployment**: hardened daemon (backoff, heartbeat, graceful shutdown) in production on a Hostinger VPS, systemd, 24/7.
 - **Public status page**: http://217.65.145.163:8080/ (read-only DB role, cache, hardened units).
 - **Code review & security**: helper dedup, dead code removed, least privilege, SSH/systemd hardening.
-- **M5 (partial)**: rate limits verified (see below); **API down/recovered** alert to the admin chat.
+- **M5 (partial)**: rate limits verified (see below); **API down/recovered** alert to the admin chat; `growth_mode_change` event added; end-to-end validated on a real change (controlled test).
 
 ---
 
 ## 🔜 Short term (next steps)
 
-- [ ] **Test on a real config change** of the dex (or simulated) → confirm the end-to-end flow in real conditions.
+- [x] **Test on a real config change** → validated end-to-end in production via a controlled baseline test (real `oi_cap_change` + `growth_mode_change` alerts fired, then self-healed).
 - [ ] **Confirm the halt mechanism** with the trade.xyz team (API field not observed — see `HANDOVER.md`).
 - [ ] **Open the channel to the public** (switch the Telegram channel to public) once validated.
 
