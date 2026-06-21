@@ -46,7 +46,7 @@ xyz/
 ├── learning/                  # background study notes (Hyperliquid / HIP-3)
 └── xyz-bot/                    # the application
     ├── src/                   # config, hl_client, snapshot, events, db, messages, telegram, web, main
-    ├── tests/                 # 53 tests (no network / no DB needed, except DB integration tests)
+    ├── tests/                 # 64 tests, ~80% coverage (core logic ~100%); DB tests skip if no DB
     ├── db/schema.sql          # market_state, dex_state, events, bot_status
     └── deploy/                # systemd units + DEPLOY.md + OPS.md
 ```
@@ -73,6 +73,7 @@ in memory (lost on restart).
 cd xyz-bot
 pip install -r requirements-dev.txt
 python -m pytest tests/ -v
+python -m pytest tests/ --cov=src --cov-report=term-missing   # coverage report
 ```
 DB integration tests target a test database; they are **skipped** if it is unreachable
 (`TEST_PG_DSN`, default `postgresql://<user>@localhost:5432/xyzbot_test`).

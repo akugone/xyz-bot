@@ -1,9 +1,11 @@
 """Backoff computation + a full cycle (run_cycle), no network and no DB."""
 import asyncio
 import copy
+from types import SimpleNamespace
 
+import src.main as main_mod
 from src.config import config
-from src.main import api_alert_action, backoff_delay, run_cycle
+from src.main import _ops_alert, api_alert_action, backoff_delay, run_cycle
 
 from .fixtures import META_RESPONSE, PERP_DEX_LIMITS_RESPONSE
 
@@ -61,10 +63,10 @@ class SpyNotifier:
     dry_run = True
 
     def __init__(self):
-        self.sent = []
+        self.sent = []  # list of (text, chat_id)
 
-    async def send(self, text):
-        self.sent.append(text)
+    async def send(self, text, chat_id=None):
+        self.sent.append((text, chat_id))
 
     async def aclose(self):
         pass
@@ -87,7 +89,7 @@ def test_run_cycle_seeds_then_alerts():
                 pair[1] = "99000000.0"
         client2 = FakeClient(META_RESPONSE, limits2)
         await run_cycle(client2, None, spy, snap1)
-        assert any("OI cap changed — xyz:HOOD" in m for m in spy.sent)
+        assert any("OI cap changed — xyz:HOOD" in text for text, _ in spy.sent)
 
     asyncio.run(scenario())
 
@@ -100,3 +102,19 @@ def test_run_cycle_no_change_no_alert():
         await run_cycle(client, None, spy, snap1)                # identical
         assert spy.sent == []                                    # no alert
     asyncio.run(scenario())
+
+
+# --- ops alert routing (_ops_alert) ---
+
+def test_ops_alert_goes_to_admin_chat(monkeypatch):
+    monkeypatch.setattr(main_mod, "config", SimpleNamespace(telegram_admin_chat_id="999"))
+    spy = SpyNotifier()
+    asyncio.run(_ops_alert(spy, "API down"))
+    assert spy.sent == [("API down", "999")]   # sent to the admin chat
+
+
+def test_ops_alert_without_admin_only_logs(monkeypatch):
+    monkeypatch.setattr(main_mod, "config", SimpleNamespace(telegram_admin_chat_id=None))
+    spy = SpyNotifier()
+    asyncio.run(_ops_alert(spy, "API down"))
+    assert spy.sent == []                       # no admin chat → logged only, nothing sent

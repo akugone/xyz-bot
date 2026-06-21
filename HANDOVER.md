@@ -75,4 +75,5 @@
 - **2026-06-21** — Public status page added (`src/web.py`, aiohttp, read-only DB role) + SSH/systemd
   hardening + ops docs.
 - **2026-06-21** — Code review applied (cleanup, dead code removal, least privilege). M5 partial:
-  rate limits verified, API-down alert added. 53 tests green.
+  rate limits verified, API-down alert added. 64 tests green (~80% coverage; core logic ~100%,
+  remaining gaps are the daemon-loop orchestration and web server bootstrap, validated live).

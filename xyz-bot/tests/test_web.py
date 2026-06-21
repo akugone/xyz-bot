@@ -1,6 +1,8 @@
-"""Status payload assembly + HTML rendering tests (pure, no DB and no server)."""
+"""Status payload assembly, HTML rendering, and the read cache (no server)."""
+import asyncio
 from datetime import datetime, timedelta, timezone
 
+import src.web as web
 from src.web import render_html, status_payload
 
 NOW = datetime(2026, 6, 21, 12, 0, 0, tzinfo=timezone.utc)
@@ -68,3 +70,55 @@ def test_render_html_escapes_values():
     html = render_html(status_payload(_status(NOW), [ev], NOW))
     assert "<script>" not in html
     assert "&lt;script&gt;" in html
+
+
+# --- read cache (_read_cached / _build_payload) ---
+
+class _FakeDB:
+    def __init__(self):
+        self.status_calls = 0
+        self.events_calls = 0
+
+    async def get_status(self, dex):
+        self.status_calls += 1
+        return _status(NOW)
+
+    async def recent_events(self, dex, limit):
+        self.events_calls += 1
+        return []
+
+
+def _app(db):
+    return {"db": db, "cache": {"at": 0.0, "rows": None}}
+
+
+def test_read_cached_hits_db_once_within_ttl():
+    db = _FakeDB()
+    app = _app(db)
+
+    async def scenario():
+        await web._read_cached(app)
+        await web._read_cached(app)   # within TTL → served from cache
+
+    asyncio.run(scenario())
+    assert db.status_calls == 1
+    assert db.events_calls == 1
+
+
+def test_read_cached_refreshes_after_ttl():
+    db = _FakeDB()
+    app = _app(db)
+
+    async def scenario():
+        await web._read_cached(app)
+        app["cache"]["at"] = -10_000   # force staleness
+        await web._read_cached(app)
+
+    asyncio.run(scenario())
+    assert db.status_calls == 2
+
+
+def test_build_payload_uses_db_rows():
+    payload = asyncio.run(web._build_payload(_app(_FakeDB())))
+    assert payload["markets_count"] == 93
+    assert payload["recent_events"] == []
