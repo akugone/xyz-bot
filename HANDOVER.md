@@ -54,7 +54,10 @@
   **(the only real unknown on the data side)**
 - [ ] **One message per event, or grouped** when an action touches several coins? (currently: one
   message per event).
-- [ ] **Target latency** + any known info-API rate limits beyond the documented 1200/min.
+- [ ] **Target latency**: is retail-grade (2–5s, current design) enough, or is sub-second needed? Sub-second
+  is **not reachable on the public API** (the 1200 weight/min cap puts the floor at ~3–5s) — it would require
+  a private node or gRPC streaming, i.e. a different architecture. MMs (who'd need it) were excluded during
+  scoping, so the current design assumes retail. See `ROADMAP.md` → "Latency floor & the sub-second case".
 - [ ] **Live cross transition**: can a market really switch to `normal` (cross) after listing, or is
   it fixed? (we detect it via the diff regardless, but good to know).
 - [ ] **Telegram channel**: is "XYZ Deployer Alerts" the final channel, or should it point elsewhere

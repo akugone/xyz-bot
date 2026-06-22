@@ -22,6 +22,7 @@
 
 - [x] **Test on a real config change** → validated end-to-end in production via a controlled baseline test (real `oi_cap_change` + `growth_mode_change` alerts fired, then self-healed).
 - [ ] **Confirm the halt mechanism** with the trade.xyz team (API field not observed — see `HANDOVER.md`).
+- [ ] **Confirm latency expectations** with the trade.xyz team: is the target retail (2–5s, current design), or is sub-second needed (MM-grade)? See the constraint below — sub-second is a different architecture, not a tuning.
 - [ ] **Open the channel to the public** (switch the Telegram channel to public) once validated.
 
 ## 🌍 Medium term
@@ -49,3 +50,17 @@
   - poll **2s** → 30 cycles/min → 1200/min (**100% = do not**).
 - **Conclusion**: 5s is safe; **do not go below ~3s**. Rate limiting is not a concern at the current setting.
 - Source: https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits
+
+### Latency floor & the sub-second case (architectural constraint)
+
+- On the **public API**, the latency floor is **~3–5s** (driven by the 1200 weight/min cap, not by our code).
+  A **sub-second** target (e.g. 1 call/s over 2–3 endpoints = 2400–3600 weight/min) **exceeds the public
+  rate limit** — it is not reachable by tuning the poll interval.
+- This is **out of scope** for the current project: the audience is **retail / community** (2–5s is fine);
+  market makers, who would need sub-second, were **explicitly excluded** during scoping.
+- **If** sub-second is ever required, it means a **different architecture**, not a config change:
+  - **Private Hyperliquid node** → read L1 actions directly, ~100ms (heavy infra, different detection model).
+  - **gRPC streaming via a provider** (Quicknode, Dwellir…) → sub-second, with infra cost.
+  - **Public API only** → ~3–5s floor, no better.
+  (The WebSocket API does not help: no WS feed exists for these deployer config changes.)
+- → Confirm the latency expectation with the trade.xyz team before considering any of this.
