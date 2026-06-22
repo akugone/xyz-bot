@@ -1,5 +1,8 @@
 # Study of the trade.xyz "deployer" — readable actions for the monitoring bot
 
+> **Historical research note (pre-build).** Superseded by `../xyz-deployer-bot-SPEC.md`, which is the
+> canonical reference for the actions, endpoints, and event mapping. Kept for provenance.
+
 **Address studied:** `0x88806a71D74ad0a510b350545C9aE490912F0888`
 
 ---

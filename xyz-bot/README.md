@@ -4,13 +4,9 @@ Telegram bot that notifies, in near real-time, configuration changes of the `xyz
 Hyperliquid (OI caps, margin mode, leverage, new markets, halts). Read-only API access +
 state diff + Telegram ping.
 
-> Project overview & docs index: see the **repo root [README](../README.md)**.
+> Overview, "why a snapshot diff", and the docs index live in the **repo root [README](../README.md)**.
 > Project context: `CLAUDE.md`. Full spec: `../xyz-deployer-bot-SPEC.md`. Background: `../learning/`.
-
-## Why
-The xyz deployer exposes no event feed. We poll Hyperliquid's REST info API, compare current
-state to the previous one (snapshot), and alert on changes. Audience: retail + community
-Telegram groups.
+> This file = app-level dev reference (run, layout, tests).
 
 ## Quickstart (dev)
 ```bash

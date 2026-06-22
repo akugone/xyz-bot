@@ -247,39 +247,16 @@ message when an action touches several coins.
 - **Observability**: structured logging + a heartbeat (e.g. a daily "still alive" ping or metric)
   to know whether the service is running.
 
-### Example systemd unit
-```ini
-[Unit]
-Description=xyz deployer alert bot
-After=network-online.target
-
-[Service]
-ExecStart=/usr/bin/python3 /opt/xyz-bot/main.py
-EnvironmentFile=/opt/xyz-bot/.env
-Restart=always
-RestartSec=5
-User=xyzbot
-
-[Install]
-WantedBy=multi-user.target
-```
+> The actual systemd units and the full deployment procedure are the single source of truth in
+> `xyz-bot/deploy/` (`xyz-bot.service`, `xyz-bot-web.service`, `DEPLOY.md`, `OPS.md`).
 
 ---
 
 ## 9. Development plan (milestones)
 
-1. **M0 — Scoping**: ✅ events / audience / REST / sub-deployers settled (see §10). Still to settle:
-   exact Telegram channel, target latency, rate limits. Get DB + VM access.
-2. **M1 — Read**: info API client; fetch + parse `meta`, `perpDexLimits` for `dex="xyz"`. Log a
-   readable snapshot.
-3. **M2 — Persistence & diff**: SQL schema; per-coin normalization; diff engine (ignoring
-   oracle/mark) producing a list of typed events.
-4. **M3 — Notifications**: Telegram Bot API integration; message templates; idempotency via `dedup_key`.
-5. **M4 — Daemon & deployment**: async loop + backoff on API error; systemd unit; SSH deployment;
-   logs + heartbeat.
-6. **M5 — Hardening**: rate-limit handling, reconnections, alert if the API is down, test on a real
-   change (or simulated by injecting a fake previous snapshot).
-7. **M6 (optional)**: multi-dex extension; second Telegram channel; richer "pre-OI-increase" signal.
+The original M0–M6 plan has been delivered (M1–M5 done; M6 optional). To avoid duplication, the
+**current build status** lives in `HANDOVER.md` (§1, status by milestone) and the **next steps /
+backlog** in `ROADMAP.md` — not tracked here.
 
 ---
 
@@ -293,7 +270,5 @@ WantedBy=multi-user.target
 - **Sub-deployers**: they exist. → monitor by **state diff** (agnostic to the signing address);
   no need to list the sub-deployers.
 
-**Risks / still-open points:**
-- **Halt detection**: API field unconfirmed (verify on real data).
-- **Rate limits** of the info API under tight polling.
-- **Target Telegram channel** + target latency (to finalize).
+**Open questions** (halt mechanism, target latency / rate limits, exact Telegram channel) are
+tracked live in `HANDOVER.md` §4 — see there for the current state.

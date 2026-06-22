@@ -66,31 +66,15 @@ Runs as a daemon under **systemd** (`Restart=always`) on a Hostinger VPS with a 
 - Code in `src/`, SQL schema in `db/schema.sql`, systemd units in `deploy/`.
 - Structured logging + heartbeat. Backoff on API error.
 
-## Milestones (state)
-- **M1 Read** ✅ — info API client + readable snapshot (93 coins) + tests.
-  - **Finding — marginMode**: `marginMode` only appears in `meta.universe[]` for isolated markets
-    (`strictIsolated`/`noCross`, with `onlyIsolated:true`). For a cross market (`normal`) it is
-    **absent** → normalized `absent → "normal"` in `snapshot._margin_mode()` so the diff catches
-    the move to cross.
-  - **Finding — halt**: no explicit halt field in `meta` or `metaAndAssetCtxs`. Only `isDelisted`
-    exists (permanent delisting ≠ temporary halt). `isHalted` likely only appears when a market is
-    halted (read defensively). To confirm on a real halt.
-- **M2 Diff & persistence** ✅ — `src/events.py` (typed events + `dedup_key` + silent seed) and
-  `src/db.py` (asyncpg, load/save snapshot, `record_new_events` with `ON CONFLICT DO NOTHING`).
-  `run_loop` loads the baseline from Postgres; in-memory fallback if `PG_DSN` is absent.
-- **M3 Notifications** ✅ — `src/messages.py` (templates) + `src/telegram.py` (`TelegramNotifier`,
-  dry-run). Live sending validated via `@tradexyz_alerts_bot` to the broadcast channel. Public
-  messages in English.
-- **M4 Daemon & deploy** ✅ — hardened `run_loop` (backoff, heartbeat, graceful SIGTERM). **In
-  production** on Hostinger VPS `217.65.145.163` (Ubuntu 24.04), systemd `xyz-bot` active +
-  enabled, local Postgres 16. Update: `rsync` of `xyz-bot/` then `systemctl restart`.
-- **Public status page** ✅ — separate service `src/web.py` (aiohttp, read-only DB role
-  `WEB_PG_DSN`) → `GET /` (HTML) + `/status.json`. Daemon writes a `bot_status` heartbeat each
-  cycle. systemd `xyz-bot-web` (port 8080), http://217.65.145.163:8080/.
-- **M5 Hardening** ⏳ — rate limits verified (1200 weight/min/IP, ~40% at 5s; floor ~3s).
-  **API down/recovered** alert on transition (`API_DOWN_THRESHOLD` → `TELEGRAM_ADMIN_CHAT_ID`,
-  not the public channel). End-to-end validated on a real change (controlled baseline test).
-  `growth_mode_change` event added. Remaining: confirm halt mechanism. Details in `../ROADMAP.md`.
+## Status
+Built and in production (M1–M5 done). To avoid duplication, status is **not** tracked here:
+current status → `../HANDOVER.md`, next steps / backlog → `../ROADMAP.md`.
+
+Two findings that explain the code (kept here because they drive implementation choices):
+- **marginMode**: only present for isolated markets; **absent = cross** → normalized
+  `absent → "normal"` in `snapshot._margin_mode()` so the diff catches the move to cross.
+- **halt**: no explicit API field; `isHalted` is read defensively and the `halt`/`unhalt` events are
+  **provisional** — to confirm on a real halt.
 
 ## Quickstart (dev)
 ```bash
