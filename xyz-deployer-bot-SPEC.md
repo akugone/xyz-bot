@@ -63,6 +63,12 @@ Closed list of actions the deployer can sign. The "Tracker" column = default MVP
 | `setPerpAnnotation` | metadata (category, description, displayName, keywords) | ❌ cosmetic |
 | `setOracle` | oracle/mark price update (~every 3s) | ❌ **noise — exclude from diff** |
 
+> **Note — delisting / relisting are tracked too, but they are not actions in this list.** There is
+> no dedicated delist/relist `PerpDeployAction`; a market being removed or brought back is reflected
+> by the `isDelisted` field in `meta.universe[]`. The bot detects both by state diff, emitting
+> `delisted` / `relisted` events (a re-listed coin already exists in the universe, so it is not a
+> `new_market`). See the mapping in §4.
+
 Margin modes: `strictIsolated` (non-withdrawable isolated margin), `noCross` (isolated only),
 `normal` (cross allowed). **Confirmed transitions: a market only moves in the loosening
 direction — `strictIsolated → noCross → normal (cross)`, never backwards.** The bot must also
