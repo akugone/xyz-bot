@@ -26,10 +26,14 @@
 - **Dex** being watched (`xyz`).
 - **Markets watched** — number of monitored markets (≈ 93). The ⓘ icon shows, on hover, the full
   list of tracked tokens.
-- **Last check** — time since the last cycle.
+- **Last check** — absolute UTC time of the last cycle (e.g. `21:23:31 UTC`). Health itself is shown
+  by the ONLINE/OFFLINE badge, so this is a plain timestamp (it never goes "stale" between refreshes).
+- **Running since** — when the current bot process started (uptime).
 - **Errors (streak)** — current consecutive error count (0 = nominal).
 - **Latest alerts** — table of the latest detected config changes (UTC time, type, market,
   old → new value). This is the public history of alerts sent to the channel.
+- **Header links** (top-right): **📣 Telegram** (the public channel) and **📈 Uptime** (the BetterStack
+  uptime page). Both are optional, set via `TELEGRAM_CHANNEL_URL` / `UPTIME_URL`.
 
 ## JSON format (`/status.json`)
 

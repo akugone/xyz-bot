@@ -16,7 +16,8 @@
 | **M2 — Diff & persistence** | ✅ | diff engine + Postgres (asyncpg). Baseline survives restart (seed only on empty DB) |
 | **M3 — Notifications** | ✅ | templates + Telegram, **live sending validated** to the broadcast channel "XYZ Deployer Alerts" (`@tradexyz_alerts_bot`, bot is admin). Public messages in **English** |
 | **M4 — Daemon & deploy** | ✅ | **in production** on a Hostinger VPS (Ubuntu 24.04), systemd active + enabled at boot, local Postgres. Runs 24/7 |
-| **Public status page** | ✅ | separate web service, read-only DB role, http://217.65.145.163:8080/ |
+| **Public status page** | ✅ | separate web service, read-only DB role, http://217.65.145.163:8080/. Tokens tooltip, absolute "Last check", "Running since", header links (Telegram + Uptime) |
+| **External monitoring** | ✅ | BetterStack pings `/status.json` → public uptime page (https://xyzbot.betteruptime.com/) + alert if the VPS itself goes down (closes the watcher blind spot) |
 | **Code review & hardening** | ✅ | dedup of helpers, dead code removed, least privilege, SSH/systemd hardening |
 | **M5 — Hardening** | ⏳ | rate limits verified, API-down alert done, end-to-end validated on a real change (controlled test). Remaining: confirm the halt mechanism |
 
@@ -88,3 +89,6 @@
   doesn't fire. `relisted` now covers it (mirror of `delisted`). 72 tests green.
 - **2026-06-22** — Broadcast channel "XYZ Deployer Alerts" switched to **public**. Docs de-duplicated
   (single source of truth per concern).
+- **2026-06-22** — Status page enriched (tracked-tokens tooltip, formatted OI-cap amounts, absolute
+  "Last check", "Running since", header links Telegram + Uptime). **External monitoring** set up on
+  BetterStack (public uptime page + VPS-down alert), which closes the autonomy blind spot. 75 tests green.

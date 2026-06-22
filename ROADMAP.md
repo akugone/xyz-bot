@@ -2,7 +2,7 @@
 
 > Living roadmap, updated as we go. See also `HANDOVER.md` (status & open questions),
 > `xyz-deployer-bot-SPEC.md` (spec), `xyz-bot/deploy/OPS.md` (operations).
-> Last updated: **2026-06-21**.
+> Last updated: **2026-06-22**.
 
 ---
 
@@ -13,8 +13,13 @@
 - **M3 — Notifications**: Telegram sending to the broadcast channel "XYZ Deployer Alerts" (messages in **English**).
 - **M4 — Deployment**: hardened daemon (backoff, heartbeat, graceful shutdown) in production on a Hostinger VPS, systemd, 24/7.
 - **Public status page**: http://217.65.145.163:8080/ (read-only DB role, cache, hardened units).
+  Enriched: tracked-tokens tooltip, OI-cap amounts formatted, "Last check" as absolute UTC time,
+  "Running since" (uptime), header links (Telegram + Uptime).
+- **External uptime monitoring**: BetterStack pings `/status.json`, public uptime page
+  (https://xyzbot.betteruptime.com/) with % + history, **and alerts if the VPS itself goes down** —
+  closes the "who watches the watcher" blind spot (the bot can't alert when it's the one that's down).
 - **Code review & security**: helper dedup, dead code removed, least privilege, SSH/systemd hardening.
-- **M5 (partial)**: rate limits verified (see below); **API down/recovered** alert to the admin chat; `growth_mode_change` event added; end-to-end validated on a real change (controlled test).
+- **M5 (partial)**: rate limits verified (see below); **API down/recovered** alert to the admin chat; `growth_mode_change` + `relisted` events added; end-to-end validated on a real change (controlled test).
 
 ---
 
@@ -28,7 +33,8 @@
 ## 🌍 Medium term
 
 - [ ] **Domain + HTTPS** for the status page (Caddy, auto-TLS) → clean URL `https://status.<domain>`.
-- [ ] **Enrich the page**: channel subscribe link, markets sitting at their OI cap, mini history.
+- [~] **Enrich the page**: ✅ Telegram link + tracked-tokens tooltip done. Remaining: markets sitting
+  at their OI cap. (Uptime history is now provided externally by BetterStack.)
 - [ ] **Backups**: the DB is reconstructible (re-seed), but a daily `events` dump (audit trail) would be a plus.
 
 ## 🧪 Long term / options (M6)
