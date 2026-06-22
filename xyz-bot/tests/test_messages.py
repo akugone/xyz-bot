@@ -7,6 +7,7 @@ from src.events import (
     MARGIN_MODE_CHANGE,
     NEW_MARKET,
     OI_CAP_CHANGE,
+    RELISTED,
     TOTAL_OI_CAP_CHANGE,
     UNHALT,
     Event,
@@ -65,6 +66,10 @@ def test_halt_and_unhalt():
 
 def test_delisted():
     assert "delisted — xyz:DXY" in format_event(Event("xyz", "xyz:DXY", DELISTED, "listed", "delisted"))
+
+
+def test_relisted():
+    assert "relisted — xyz:ZHIPU" in format_event(Event("xyz", "xyz:ZHIPU", RELISTED, "delisted", "listed"))
 
 
 def test_amount_keeps_non_integer_and_raw():

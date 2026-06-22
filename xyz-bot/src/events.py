@@ -29,6 +29,7 @@ GROWTH_MODE_CHANGE = "growth_mode_change"
 HALT = "halt"
 UNHALT = "unhalt"
 DELISTED = "delisted"
+RELISTED = "relisted"
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,11 @@ def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
         # delisting: market that goes listed → delisted (is_listed True → False).
         if p.is_listed and not c.is_listed:
             events.append(Event(dex, coin, DELISTED, "listed", "delisted"))
+
+        # relisting: a market that comes back (is_listed False → True). A previously delisted
+        # coin already exists in the universe, so it is NOT caught by new_market — hence this.
+        if not p.is_listed and c.is_listed:
+            events.append(Event(dex, coin, RELISTED, "delisted", "listed"))
 
     return events
 

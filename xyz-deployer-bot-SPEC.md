@@ -124,6 +124,7 @@ All: `POST https://api.hyperliquid.xyz/info`, JSON body, `"dex": "xyz"` for the 
 | Margin mode changed | `setMarginModes` | `meta.universe[].marginMode` (also detect → `normal`/cross) |
 | Max leverage changed | `setMarginTableIds` | `meta.universe[].maxLeverage` + `meta.marginTables[]` |
 | New market | `registerAsset(2)` | new entry in `meta.universe[]` |
+| Delisting / relisting | — | `meta.universe[].isDelisted` flip (a re-listed coin already exists in the universe → not a new_market, hence a dedicated `relisted` event) |
 | Halt / resume | `haltTrading` | **TO VERIFY** — API status field (likely a flag; otherwise infer via ctx disappearance / `isDelisted`) |
 
 ---

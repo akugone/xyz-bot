@@ -55,6 +55,8 @@ Runs as a daemon under **systemd** (`Restart=always`) on a Hostinger VPS with a 
 - Margin mode → `meta.universe[].marginMode` (also catch → `normal`/cross)
 - Leverage → `meta.universe[].maxLeverage`
 - New market → new entry in `meta.universe[]`
+- Delisting / relisting → `meta.universe[].isDelisted` flip (True→listed=delisted, False→listed=relisted). A
+  re-listed coin already exists in the universe, so it is NOT a new_market — hence the separate `relisted` event.
 - Growth mode → `meta.universe[].growthMode` (enabled/disabled; only fires on a real True↔False flip)
 - Halt/resume → mechanism unconfirmed (no explicit API field observed; `isHalted` read defensively)
 

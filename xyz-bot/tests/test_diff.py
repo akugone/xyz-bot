@@ -15,6 +15,7 @@ from src.events import (
     MARGIN_MODE_CHANGE,
     NEW_MARKET,
     OI_CAP_CHANGE,
+    RELISTED,
     TOTAL_OI_CAP_CHANGE,
     UNHALT,
     diff,
@@ -122,6 +123,17 @@ def test_delisting():
     curr.coins["xyz:HOOD"].is_listed = False
     events = diff(prev, curr)
     assert [e.event_type for e in events] == [DELISTED]
+
+
+def test_relisting():
+    """A delisted market coming back (is_listed False → True) fires `relisted`, not new_market."""
+    prev = base_snapshot()
+    prev.coins["xyz:HOOD"].is_listed = False     # was delisted
+    curr = copy.deepcopy(prev)
+    curr.coins["xyz:HOOD"].is_listed = True      # comes back
+    events = diff(prev, curr)
+    assert [e.event_type for e in events] == [RELISTED]
+    assert (events[0].old_value, events[0].new_value) == ("delisted", "listed")
 
 
 def test_growth_mode_toggle():

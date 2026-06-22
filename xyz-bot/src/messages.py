@@ -13,6 +13,7 @@ from .events import (
     MARGIN_MODE_CHANGE,
     NEW_MARKET,
     OI_CAP_CHANGE,
+    RELISTED,
     TOTAL_OI_CAP_CHANGE,
     UNHALT,
     Event,
@@ -51,6 +52,9 @@ def format_event(ev: Event) -> str:
 
     if t == DELISTED:
         return f"🗑️ Market delisted — {coin}"
+
+    if t == RELISTED:
+        return f"♻️ Market relisted — {coin}"
 
     # generic fallback (shouldn't happen if all types are handled)
     return f"ℹ️ {t} — {coin}: {ev.old_value} → {ev.new_value}"

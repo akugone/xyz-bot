@@ -78,8 +78,11 @@
 - **2026-06-21** — Public status page added (`src/web.py`, aiohttp, read-only DB role) + SSH/systemd
   hardening + ops docs.
 - **2026-06-21** — Code review applied (cleanup, dead code removal, least privilege). M5 partial:
-  rate limits verified, API-down alert added. 70 tests green (~80% coverage; core logic ~100%,
+  rate limits verified, API-down alert added. 72 tests green (~80% coverage; core logic ~100%,
   remaining gaps are the daemon-loop orchestration and web server bootstrap, validated live).
 - **2026-06-21** — Added `growth_mode_change` event (🌱). End-to-end validated in production via a
   controlled test: tampered the stored baseline → the next cycle fired real `oi_cap_change` +
   `growth_mode_change` alerts to the channel, then self-healed (no duplicates).
+- **2026-06-22** — Added `relisted` event (♻️). Spotted via ZHIPU: a previously delisted market that
+  comes back flips `isDelisted` (False→listed) — it already exists in the universe so `new_market`
+  doesn't fire. `relisted` now covers it (mirror of `delisted`). 72 tests green.
