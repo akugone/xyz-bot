@@ -35,6 +35,7 @@ def _stale_after() -> float:
 def status_payload(status, events, now: datetime, coins=()) -> dict:
     """Assemble the status dict from a `bot_status` row, recent events, and the coin list."""
     last = status["last_cycle_at"] if status else None
+    started = status["started_at"] if status else None
     age = (now - last).total_seconds() if last else None
     return {
         "dex": config.dex_name,
@@ -42,8 +43,10 @@ def status_payload(status, events, now: datetime, coins=()) -> dict:
         "markets_count": status["markets_count"] if status else None,
         "markets": list(coins),
         "consecutive_errors": status["consecutive_errors"] if status else None,
-        "started_at": _iso(status["started_at"]) if status else None,
+        "started_at": _iso(started),
+        "started_at_display": _fmt_utc(started, "%Y-%m-%d %H:%M UTC"),
         "last_cycle_at": _iso(last),
+        "last_cycle_at_display": _fmt_utc(last, "%H:%M:%S UTC"),
         "last_cycle_age_sec": int(age) if age is not None else None,
         "recent_events": [
             {
@@ -71,9 +74,6 @@ def render_html(payload: dict) -> str:
         f"<td>{_change_cell(e)}</td></tr>"
         for e in payload["recent_events"]
     ) or "<tr><td colspan='4' class='muted'>No alerts yet.</td></tr>"
-
-    age = payload["last_cycle_age_sec"]
-    age_txt = f"{age}s ago" if age is not None else "—"
 
     markets = payload.get("markets") or []
     count_txt = payload["markets_count"] if payload["markets_count"] is not None else "—"
@@ -123,7 +123,8 @@ def render_html(payload: dict) -> str:
   <div class="grid">
     <div class="card"><div class="k">Dex</div><div class="v">{html.escape(payload['dex'] or '—')}</div></div>
     <div class="card">{markets_card}</div>
-    <div class="card"><div class="k">Last check</div><div class="v">{age_txt}</div></div>
+    <div class="card"><div class="k">Last check</div><div class="v" style="font-size:1rem">{payload['last_cycle_at_display']}</div></div>
+    <div class="card"><div class="k">Running since</div><div class="v" style="font-size:1rem">{payload['started_at_display']}</div></div>
     <div class="card"><div class="k">Errors (streak)</div><div class="v">{payload['consecutive_errors'] if payload['consecutive_errors'] is not None else '—'}</div></div>
   </div>
   <h2 style="font-size:1rem;">Latest alerts</h2>
@@ -144,6 +145,11 @@ def _change_cell(e: dict) -> str:
 
 def _iso(dt) -> str | None:
     return dt.isoformat() if dt else None
+
+
+def _fmt_utc(dt, fmt: str) -> str:
+    """Absolute UTC time string (stable, never goes "stale" between refreshes)."""
+    return dt.astimezone(timezone.utc).strftime(fmt) if dt else "—"
 
 
 # --- app aiohttp ---

@@ -34,6 +34,19 @@ def test_down_when_stale():
     assert p["up"] is False
 
 
+def test_absolute_time_displays():
+    p = status_payload(_status(NOW), [], NOW)
+    assert p["last_cycle_at_display"].endswith("UTC")   # absolute, not "Ns ago"
+    assert p["started_at_display"].endswith("UTC")
+
+
+def test_render_shows_last_check_and_running_since():
+    html = render_html(status_payload(_status(NOW), [], NOW))
+    assert "Last check" in html
+    assert "Running since" in html
+    assert "UTC" in html
+
+
 def test_down_when_no_status():
     p = status_payload(None, [], NOW)
     assert p["up"] is False
