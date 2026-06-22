@@ -60,8 +60,8 @@
   scoping, so the current design assumes retail. See `ROADMAP.md` → "Latency floor & the sub-second case".
 - [ ] **Live cross transition**: can a market really switch to `normal` (cross) after listing, or is
   it fixed? (we detect it via the diff regardless, but good to know).
-- [ ] **Telegram channel**: is "XYZ Deployer Alerts" the final channel, or should it point elsewhere
-  (community public channel, etc.)? Currently private, can be made public in one click.
+- [x] **Telegram channel**: the broadcast channel "XYZ Deployer Alerts" is now **public**. (Confirm
+  with the trade.xyz team only if they want a different/community channel as the canonical one.)
 
 ---
 
@@ -86,3 +86,5 @@
 - **2026-06-22** — Added `relisted` event (♻️). Spotted via ZHIPU: a previously delisted market that
   comes back flips `isDelisted` (False→listed) — it already exists in the universe so `new_market`
   doesn't fire. `relisted` now covers it (mirror of `delisted`). 72 tests green.
+- **2026-06-22** — Broadcast channel "XYZ Deployer Alerts" switched to **public**. Docs de-duplicated
+  (single source of truth per concern).

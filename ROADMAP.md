@@ -23,7 +23,7 @@
 - [x] **Test on a real config change** → validated end-to-end in production via a controlled baseline test (real `oi_cap_change` + `growth_mode_change` alerts fired, then self-healed).
 - [ ] **Confirm the halt mechanism** with the trade.xyz team (API field not observed — see `HANDOVER.md`).
 - [ ] **Confirm latency expectations** with the trade.xyz team: is the target retail (2–5s, current design), or is sub-second needed (MM-grade)? See the constraint below — sub-second is a different architecture, not a tuning.
-- [ ] **Open the channel to the public** (switch the Telegram channel to public) once validated.
+- [x] **Open the channel to the public** — done; "XYZ Deployer Alerts" is now a public channel.
 
 ## 🌍 Medium term
 
