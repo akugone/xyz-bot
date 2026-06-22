@@ -30,6 +30,9 @@ class Config:
     # public status page (separate web service)
     web_host: str = os.getenv("WEB_HOST", "0.0.0.0")
     web_port: int = int(os.getenv("WEB_PORT", "8080"))
+    # optional header links on the status page (rendered only if set)
+    telegram_channel_url: str | None = os.getenv("TELEGRAM_CHANNEL_URL")
+    uptime_url: str | None = os.getenv("UPTIME_URL")
 
 
 config = Config()

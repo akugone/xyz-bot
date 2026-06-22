@@ -43,6 +43,8 @@ def status_payload(status, events, now: datetime, coins=()) -> dict:
         "markets_count": status["markets_count"] if status else None,
         "markets": list(coins),
         "consecutive_errors": status["consecutive_errors"] if status else None,
+        "telegram_url": config.telegram_channel_url,
+        "uptime_url": config.uptime_url,
         "started_at": _iso(started),
         "started_at_display": _fmt_utc(started, "%Y-%m-%d %H:%M UTC"),
         "last_cycle_at": _iso(last),
@@ -85,6 +87,15 @@ def render_html(payload: dict) -> str:
         f"<div class='v'>{count_txt}</div>"
     )
 
+    links = []
+    if payload.get("telegram_url"):
+        links.append(f"<a href='{html.escape(payload['telegram_url'])}' target='_blank' "
+                     f"rel='noopener'>📣 Telegram</a>")
+    if payload.get("uptime_url"):
+        links.append(f"<a href='{html.escape(payload['uptime_url'])}' target='_blank' "
+                     f"rel='noopener'>📈 Uptime</a>")
+    links_html = f"<nav class='links'>{''.join(links)}</nav>" if links else ""
+
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -96,7 +107,13 @@ def render_html(payload: dict) -> str:
   body {{ font-family: -apple-system, system-ui, sans-serif; background:#0b0e14; color:#e6e6e6;
          margin:0; padding:2rem 1rem; }}
   .wrap {{ max-width: 760px; margin: 0 auto; }}
-  h1 {{ font-size: 1.25rem; margin:0 0 1.5rem; }}
+  h1 {{ font-size: 1.25rem; margin:0; }}
+  .top {{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
+    gap:.75rem; margin-bottom:1.5rem; }}
+  .links a {{ margin-left:.6rem; text-decoration:none; color:#9db4ff; background:#141925;
+    border:1px solid #232a3a; border-radius:8px; padding:.35rem .7rem; font-size:.85rem;
+    white-space:nowrap; }}
+  .links a:hover {{ border-color:#3a4566; }}
   .badge {{ font-weight:700; color:{color}; }}
   .grid {{ display:grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap:1rem; margin-bottom:2rem; }}
   .card {{ background:#141925; border:1px solid #232a3a; border-radius:10px; padding:1rem; }}
@@ -119,7 +136,10 @@ def render_html(payload: dict) -> str:
   footer {{ margin-top:2rem; color:#8a93a6; font-size:.8rem; }}
 </style></head>
 <body><div class="wrap">
-  <h1>{dot} xyz deployer alerts — <span class="badge">{state}</span></h1>
+  <div class="top">
+    <h1>{dot} xyz deployer alerts — <span class="badge">{state}</span></h1>
+    {links_html}
+  </div>
   <div class="grid">
     <div class="card"><div class="k">Dex</div><div class="v">{html.escape(payload['dex'] or '—')}</div></div>
     <div class="card">{markets_card}</div>

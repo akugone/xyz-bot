@@ -47,6 +47,19 @@ def test_render_shows_last_check_and_running_since():
     assert "UTC" in html
 
 
+def test_header_links_rendered_only_when_set():
+    # no links by default (URLs unset in payload)
+    base = status_payload(_status(NOW), [], NOW)
+    assert "class='links'" not in render_html(base)
+    # links appear when the URLs are present
+    base["telegram_url"] = "https://t.me/xyzalerts"
+    base["uptime_url"] = "https://xyzbot.betteruptime.com/"
+    html = render_html(base)
+    assert "https://t.me/xyzalerts" in html
+    assert "https://xyzbot.betteruptime.com/" in html
+    assert "Telegram" in html and "Uptime" in html
+
+
 def test_down_when_no_status():
     p = status_payload(None, [], NOW)
     assert p["up"] is False
