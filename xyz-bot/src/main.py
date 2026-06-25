@@ -16,6 +16,7 @@ from .config import config
 from .db import Database
 from .events import diff
 from .hl_client import HyperliquidClient
+from .cards import render_card
 from .messages import format_event
 from .snapshot import Snapshot, build_snapshot
 from .telegram import TelegramNotifier
@@ -91,7 +92,13 @@ async def run_cycle(
         for ev in new_events:
             log.info("EVENT %-20s %-14s %s -> %s",
                      ev.event_type, ev.coin or "(dex)", ev.old_value, ev.new_value)
-            await notifier.send(format_event(ev))
+            caption = format_event(ev)
+            try:
+                await notifier.send_photo(render_card(ev), caption=caption)
+            except Exception:
+                # never drop an alert because of image rendering — fall back to plain text
+                log.exception("card render/send failed for %s; sending text", ev.event_type)
+                await notifier.send(caption)
             sent.append(ev.dedup_key)
         if db is not None and sent:
             await db.mark_notified(sent)

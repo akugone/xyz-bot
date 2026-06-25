@@ -24,6 +24,11 @@ xyz-bot/
 ├── README.md
 ├── .env.example
 ├── requirements.txt / requirements-dev.txt
+├── assets/
+│   ├── fonts/          # bundled DejaVu Sans (deterministic card rendering on the VPS)
+│   └── logos/          # static logo pack, {SYMBOL}.png — built by scripts/fetch_logos.py
+├── scripts/
+│   └── fetch_logos.py  # one-time: download + validate the equity logo pack
 ├── db/
 │   └── schema.sql       # market_state, dex_state, bot_status, events
 ├── deploy/
@@ -37,11 +42,27 @@ xyz-bot/
     ├── snapshot.py     # state → per-coin snapshot normalization
     ├── events.py       # diff engine (typed events + dedup_key)
     ├── db.py           # Postgres persistence (asyncpg)
-    ├── messages.py     # event → Telegram message templates
-    ├── telegram.py     # Telegram sender (with dry-run)
+    ├── messages.py     # event → parts + flat text (caption)
+    ├── cards.py        # event → compact PNG card (logo tile + text)
+    ├── telegram.py     # Telegram sender: send() text + send_photo() (with dry-run)
     ├── web.py          # public status page (aiohttp)
     └── main.py         # daemon loop
 ```
+
+## Alert cards (logos)
+
+Alerts are sent as a compact **card image** (`sendPhoto`): a logo tile on the left + the
+event text on the right. The flat text also travels as the photo **caption**, so it stays
+copyable and drives the push-notification preview. Rendering is `cards.render_card(ev)`.
+
+- **Logos** are a static pack in `assets/logos/{SYMBOL}.png`, never fetched at runtime.
+  Rebuild/refresh it with `python -m scripts.fetch_logos` (run from `xyz-bot/`).
+- Only **equities/ETFs** get a real logo. Commodities, forex and indices (GOLD, CL, EUR,
+  SP500…) use a colored **category tile** on purpose — a stock-logo API has no entry for
+  them, or maps the ticker to the wrong company (GOLD → Barrick, CL → Colgate).
+- A bundled font (`assets/fonts/`) keeps output identical on the Linux VPS.
+- If a card ever fails to render/send, the daemon falls back to a plain-text alert — an
+  alert is never dropped.
 
 ## Tests
 ```bash
