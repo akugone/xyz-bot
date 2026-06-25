@@ -43,5 +43,24 @@ class TelegramNotifier:
         resp = await self._client.post(url, json={"chat_id": target, "text": text})
         resp.raise_for_status()
 
+    async def send_photo(
+        self, photo: bytes, caption: str, chat_id: str | None = None
+    ) -> None:
+        """Send a `photo` (PNG bytes) with `caption`. The caption carries the flat text,
+        so it stays copyable and feeds the push-notification preview even though the
+        visual is an image. Dry-run logs the caption instead of sending."""
+        target = chat_id or self._chat_id
+        if self._dry_run:
+            log.info("[DRY-RUN telegram] → chat=%s [photo %d bytes]\n%s",
+                     target, len(photo), caption)
+            return
+        url = f"https://api.telegram.org/bot{self._token}/sendPhoto"
+        resp = await self._client.post(
+            url,
+            data={"chat_id": target, "caption": caption},
+            files={"photo": ("card.png", photo, "image/png")},
+        )
+        resp.raise_for_status()
+
     async def aclose(self) -> None:
         await self._client.aclose()
