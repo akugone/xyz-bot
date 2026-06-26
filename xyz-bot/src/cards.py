@@ -107,21 +107,32 @@ def category_of(symbol: str) -> str:
     return "other"
 
 
-@lru_cache(maxsize=8)
-def _font(bold: bool, size: int) -> ImageFont.FreeTypeFont:
-    name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-    return ImageFont.truetype(str(_FONTS / name), size)
+# trade.xyz brand fonts (Geist family, SIL OFL). Geist for text, Geist Mono for the
+# numeric detail line — mirrors the trading UI. Variable fonts: weight set per instance.
+_SANS = "Geist.ttf"
+_MONO = "GeistMono.ttf"
 
 
-def _fit_font(draw: ImageDraw.ImageDraw, text: str, bold: bool, size: int,
-              max_w: int, min_size: int = 22) -> ImageFont.FreeTypeFont:
+@lru_cache(maxsize=24)
+def _font(mono: bool, weight: str, size: int) -> ImageFont.FreeTypeFont:
+    f = ImageFont.truetype(str(_FONTS / (_MONO if mono else _SANS)), size)
+    try:
+        f.set_variation_by_name(weight)  # "Regular" / "Bold" (named instance)
+    except OSError:
+        pass  # non-variable build → keep default weight
+    return f
+
+
+def _fit_font(draw: ImageDraw.ImageDraw, text: str, size: int, max_w: int,
+              *, mono: bool = False, weight: str = "Bold",
+              min_size: int = 22) -> ImageFont.FreeTypeFont:
     """Largest font (down to min_size) at which `text` fits in `max_w`."""
     while size > min_size:
-        f = _font(bold, size)
+        f = _font(mono, weight, size)
         if draw.textlength(text, font=f) <= max_w:
             return f
         size -= 2
-    return _font(bold, min_size)
+    return _font(mono, weight, min_size)
 
 
 def _logo_path(symbol: str) -> Path | None:
@@ -143,7 +154,7 @@ def _draw_tile(img: Image.Image, draw: ImageDraw.ImageDraw, symbol: str) -> None
     # fallback tile: category color + symbol text
     bg, fg = _CAT_STYLE[category_of(symbol)]
     draw.rounded_rectangle([x0, y0, x1, y1], radius=28, fill=bg)
-    f = _fit_font(draw, symbol, bold=True, size=58, max_w=_TILE - 24, min_size=20)
+    f = _fit_font(draw, symbol, 58, _TILE - 24, weight="Bold", min_size=20)
     tw = draw.textlength(symbol, font=f)
     bb = f.getbbox(symbol)
     th = bb[3] - bb[1]
@@ -160,15 +171,16 @@ def render_card(ev: Event) -> bytes:
 
     _draw_tile(img, draw, symbol_of(p.subject))
 
-    # right column: badge (accent) · subject (big) · detail (muted)
+    # right column: badge (Geist bold) · subject (Geist bold, big) · detail (Geist Mono)
     badge = p.label.upper()
-    draw.text((_TEXT_X, 50), badge, font=_font(True, 30), fill=accent)
+    draw.text((_TEXT_X, 50), badge, font=_font(False, "Bold", 30), fill=accent)
 
-    title_font = _fit_font(draw, p.subject, bold=True, size=52, max_w=_TEXT_W)
+    title_font = _fit_font(draw, p.subject, 52, _TEXT_W, weight="Bold")
     draw.text((_TEXT_X, 92), p.subject, font=title_font, fill=_TITLE)
 
     if p.detail:
-        detail_font = _fit_font(draw, p.detail, bold=False, size=30, max_w=_TEXT_W, min_size=18)
+        detail_font = _fit_font(draw, p.detail, 28, _TEXT_W,
+                                mono=True, weight="Regular", min_size=16)
         draw.text((_TEXT_X, 162), p.detail, font=detail_font, fill=_SUB)
 
     buf = io.BytesIO()

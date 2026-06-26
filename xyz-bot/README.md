@@ -25,7 +25,7 @@ xyz-bot/
 ├── .env.example
 ├── requirements.txt / requirements-dev.txt
 ├── assets/
-│   ├── fonts/          # bundled DejaVu Sans (deterministic card rendering on the VPS)
+│   ├── fonts/          # bundled Geist + Geist Mono (OFL) — on-brand, deterministic on the VPS
 │   └── logos/          # static logo pack, {SYMBOL}.png — built by scripts/fetch_logos.py
 ├── scripts/
 │   └── fetch_logos.py  # one-time: download + validate the equity logo pack
@@ -60,7 +60,8 @@ copyable and drives the push-notification preview. Rendering is `cards.render_ca
 - Only **equities/ETFs** get a real logo. Commodities, forex and indices (GOLD, CL, EUR,
   SP500…) use a colored **category tile** on purpose — a stock-logo API has no entry for
   them, or maps the ticker to the wrong company (GOLD → Barrick, CL → Colgate).
-- A bundled font (`assets/fonts/`) keeps output identical on the Linux VPS.
+- Bundled fonts (`assets/fonts/`): **Geist** for text + **Geist Mono** for the numeric
+  detail line (trade.xyz brand fonts, SIL OFL) — keeps output identical on the Linux VPS.
 - If a card ever fails to render/send, the daemon falls back to a plain-text alert — an
   alert is never dropped.
 
