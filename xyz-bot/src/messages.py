@@ -91,5 +91,7 @@ def _new_market_detail(v: str | None) -> str:
     parts = dict(p.split("=", 1) for p in v.split(";") if "=" in p) if v else {}
     lev = parts.get("lev", "?")
     mode = parts.get("mode", "?")
-    oi = _amount(parts.get("oi_cap"))
+    oi_raw = parts.get("oi_cap")
+    # a freshly listed market may have no OI cap yet (None) → show "0 USDC", not "None"
+    oi = "0 USDC" if oi_raw in (None, "None") else _amount(oi_raw)
     return f"leverage {lev}x · {mode} · OI cap {oi}"

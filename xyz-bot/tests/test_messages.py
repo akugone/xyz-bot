@@ -53,6 +53,14 @@ def test_new_market_detail_unpacked():
     assert "leverage 10x · strictIsolated · OI cap 2,000,000" in msg
 
 
+def test_new_market_no_oi_cap_shows_zero():
+    # a market listed before its OI cap is set encodes oi_cap=None → "0 USDC", not "None"
+    ev = Event("xyz", "xyz:STRC", NEW_MARKET, None, "lev=10;mode=strictIsolated;oi_cap=None")
+    msg = format_event(ev)
+    assert "OI cap 0 USDC" in msg
+    assert "None" not in msg
+
+
 def test_growth_mode():
     msg = format_event(Event("xyz", "xyz:HOOD", GROWTH_MODE_CHANGE, "enabled", "disabled"))
     assert "Growth mode · xyz:HOOD" in msg
