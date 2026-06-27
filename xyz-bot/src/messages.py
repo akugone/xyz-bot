@@ -82,7 +82,7 @@ def event_parts(ev: Event) -> EventParts:
 def format_event(ev: Event) -> str:
     """Flat text for a message / photo caption, composed from `event_parts`."""
     p = event_parts(ev)
-    head = f"{p.emoji} {p.label} — {p.subject}"
+    head = f"{p.emoji} {p.label} · {p.subject}"
     return f"{head}\n{p.detail}" if p.detail else head
 
 

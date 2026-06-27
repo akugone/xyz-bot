@@ -68,6 +68,10 @@ class SpyNotifier:
     async def send(self, text, chat_id=None):
         self.sent.append((text, chat_id))
 
+    async def send_photo(self, photo, caption, chat_id=None):
+        # alerts go out as a photo card; the caption carries the text we assert on
+        self.sent.append((caption, chat_id))
+
     async def aclose(self):
         pass
 
@@ -89,7 +93,7 @@ def test_run_cycle_seeds_then_alerts():
                 pair[1] = "99000000.0"
         client2 = FakeClient(META_RESPONSE, limits2)
         await run_cycle(client2, None, spy, snap1)
-        assert any("OI cap changed — xyz:HOOD" in text for text, _ in spy.sent)
+        assert any("OI cap changed · xyz:HOOD" in text for text, _ in spy.sent)
 
     asyncio.run(scenario())
 
