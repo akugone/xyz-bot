@@ -61,7 +61,8 @@ def status_payload(status, events, now: datetime, coins=(), *,
         "last_cycle_age_sec": int(age) if age is not None else None,
         "recent_events": [
             {
-                "at": _iso(e["created_at"]),
+                "at": _iso(e["created_at"]),  # ISO 8601 for machines (status.json)
+                "at_display": _fmt_utc(e["created_at"], "%Y-%m-%d %H:%M:%S UTC"),  # human-readable
                 "type": e["event_type"],
                 "coin": e["coin"],
                 "old": e["old_value"],
@@ -87,7 +88,7 @@ def render_html(payload: dict) -> str:
     color = "#16a34a" if up else "#dc2626"
 
     rows = "".join(
-        f"<tr><td class='t'>{html.escape(e['at'] or '')}</td>"
+        f"<tr><td class='t'>{html.escape(e['at_display'] or '')}</td>"
         f"<td><span class='tag'>{html.escape(e['type'] or '')}</span></td>"
         f"<td>{html.escape(e['coin'] or '—')}</td>"
         f"<td>{_change_cell(e)}</td></tr>"

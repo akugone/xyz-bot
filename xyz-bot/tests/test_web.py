@@ -229,3 +229,18 @@ def test_render_html_shows_pager_when_multiple_pages():
 def test_render_html_no_pager_on_single_page():
     html = render_html(status_payload(_status(NOW), [_event(NOW)], NOW))
     assert "class='pager'" not in html
+
+
+# --- date formatting ---
+
+def test_time_column_is_human_readable():
+    p = status_payload(_status(NOW), [_event(NOW)], NOW)
+    # JSON-facing field stays ISO 8601 (machine contract)
+    assert p["recent_events"][0]["at"] == NOW.isoformat()
+    # display field is the clean human format
+    assert p["recent_events"][0]["at_display"] == "2026-06-21 12:00:00 UTC"
+    # the rendered HTML table uses the readable format, not raw ISO
+    html = render_html(p)
+    assert "2026-06-21 12:00:00 UTC" in html
+    assert "T12:00:00" not in html      # no ISO "T" separator in the table
+    assert "+00:00" not in html         # no raw timezone offset
