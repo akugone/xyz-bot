@@ -146,12 +146,20 @@ class Database:
             dex,
         )
 
-    async def recent_events(self, dex: str, limit: int = 20) -> list[asyncpg.Record]:
-        """The last `limit` detected events (most recent first)."""
+    async def recent_events(
+        self, dex: str, limit: int = 20, offset: int = 0
+    ) -> list[asyncpg.Record]:
+        """A page of detected events (most recent first): `limit` rows from `offset`."""
         return await self.pool.fetch(
             "SELECT created_at, event_type, coin, old_value, new_value "
-            "FROM events WHERE dex = $1 ORDER BY id DESC LIMIT $2",
-            dex, limit,
+            "FROM events WHERE dex = $1 ORDER BY id DESC LIMIT $2 OFFSET $3",
+            dex, limit, offset,
+        )
+
+    async def count_events(self, dex: str) -> int:
+        """Total number of recorded events for `dex` (for status-page pagination)."""
+        return await self.pool.fetchval(
+            "SELECT count(*) FROM events WHERE dex = $1", dex
         )
 
     async def list_coins(self, dex: str) -> list[str]:

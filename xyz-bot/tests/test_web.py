@@ -116,18 +116,26 @@ def test_render_html_leaves_non_amount_events_raw():
 # --- read cache (_read_cached / _build_payload) ---
 
 class _FakeDB:
-    def __init__(self):
+    def __init__(self, total=0):
         self.status_calls = 0
         self.events_calls = 0
         self.coins_calls = 0
+        self.count_calls = 0
+        self._total = total
+        self.last_offset = None
 
     async def get_status(self, dex):
         self.status_calls += 1
         return _status(NOW)
 
-    async def recent_events(self, dex, limit):
+    async def recent_events(self, dex, limit, offset=0):
         self.events_calls += 1
+        self.last_offset = offset
         return []
+
+    async def count_events(self, dex):
+        self.count_calls += 1
+        return self._total
 
     async def list_coins(self, dex):
         self.coins_calls += 1
@@ -135,30 +143,30 @@ class _FakeDB:
 
 
 def _app(db):
-    return {"db": db, "cache": {"at": 0.0, "rows": None}}
+    return {"db": db, "cache": {"at": 0.0, "base": None, "events": {}}}
 
 
-def test_read_cached_hits_db_once_within_ttl():
+def test_read_base_hits_db_once_within_ttl():
     db = _FakeDB()
     app = _app(db)
 
     async def scenario():
-        await web._read_cached(app)
-        await web._read_cached(app)   # within TTL → served from cache
+        await web._read_base(app)
+        await web._read_base(app)   # within TTL → served from cache
 
     asyncio.run(scenario())
     assert db.status_calls == 1
-    assert db.events_calls == 1
+    assert db.count_calls == 1
 
 
-def test_read_cached_refreshes_after_ttl():
+def test_read_base_refreshes_after_ttl():
     db = _FakeDB()
     app = _app(db)
 
     async def scenario():
-        await web._read_cached(app)
+        await web._read_base(app)
         app["cache"]["at"] = -10_000   # force staleness
-        await web._read_cached(app)
+        await web._read_base(app)
 
     asyncio.run(scenario())
     assert db.status_calls == 2
@@ -171,9 +179,53 @@ def test_build_payload_uses_db_rows():
     assert payload["markets"] == ["xyz:HOOD", "xyz:NVDA"]
 
 
+def test_build_payload_clamps_page_and_sets_offset():
+    db = _FakeDB(total=45)  # 45 events, 20/page → 3 pages
+    payload = asyncio.run(web._build_payload(_app(db), page=2))
+    assert payload["pagination"]["page"] == 2
+    assert payload["pagination"]["total_pages"] == 3
+    assert db.last_offset == 20  # (page-1) * page_size
+    # page beyond the end is clamped to the last page
+    payload_hi = asyncio.run(web._build_payload(_app(_FakeDB(total=45)), page=99))
+    assert payload_hi["pagination"]["page"] == 3
+
+
 def test_render_html_lists_tokens_in_tooltip():
     payload = status_payload(_status(NOW), [], NOW, coins=["xyz:HOOD", "xyz:NVDA"])
     html = render_html(payload)
     assert "class='info'" in html or 'class="info"' in html   # info icon/tooltip present
     assert "HOOD" in html and "NVDA" in html                   # tokens listed
     assert "xyz:HOOD" not in html                              # dex prefix stripped
+
+
+# --- pagination ---
+
+def test_pagination_block_in_payload():
+    p = status_payload(_status(NOW), [_event(NOW)], NOW, page=2, total=45)
+    pg = p["pagination"]
+    assert pg["page"] == 2
+    assert pg["total"] == 45
+    assert pg["total_pages"] == 3          # ceil(45 / 20)
+    assert pg["has_prev"] is True
+    assert pg["has_next"] is True
+
+
+def test_parse_page_handles_bad_input():
+    assert web._parse_page("3") == 3
+    assert web._parse_page(None) == 1
+    assert web._parse_page("abc") == 1
+    assert web._parse_page("-5") == 1      # clamped to >= 1
+
+
+def test_render_html_shows_pager_when_multiple_pages():
+    html = render_html(status_payload(_status(NOW), [_event(NOW)], NOW, page=2, total=45))
+    assert "class='pager'" in html
+    assert "Page 2 / 3" in html
+    assert "/?page=1" in html              # link to newer page
+    assert "/?page=3" in html              # link to older page
+    assert "(45 total)" in html
+
+
+def test_render_html_no_pager_on_single_page():
+    html = render_html(status_payload(_status(NOW), [_event(NOW)], NOW))
+    assert "class='pager'" not in html

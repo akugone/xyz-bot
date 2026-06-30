@@ -26,17 +26,26 @@ _AMOUNT_EVENTS = {OI_CAP_CHANGE, TOTAL_OI_CAP_CHANGE}
 # (the last-cycle age is still recomputed on each request, so it stays fresh).
 _CACHE_TTL_SEC = 3.0
 
+# Events shown per page in the alerts history.
+_PAGE_SIZE = 20
+
 
 # Beyond this delay without a cycle, the bot is considered "down" (heartbeat freshness).
 def _stale_after() -> float:
     return max(60.0, config.poll_interval_sec * 3)
 
 
-def status_payload(status, events, now: datetime, coins=()) -> dict:
-    """Assemble the status dict from a `bot_status` row, recent events, and the coin list."""
+def status_payload(status, events, now: datetime, coins=(), *,
+                   page: int = 1, total: int | None = None) -> dict:
+    """Assemble the status dict from a `bot_status` row, a page of events, and the coins.
+
+    `page`/`total` drive the alerts-history pagination; `total` defaults to the number of
+    events passed in (single-page case, used by the pure render tests)."""
     last = status["last_cycle_at"] if status else None
     started = status["started_at"] if status else None
     age = (now - last).total_seconds() if last else None
+    total = len(events) if total is None else total
+    total_pages = max(1, -(-total // _PAGE_SIZE))  # ceil division
     return {
         "dex": config.dex_name,
         "up": bool(last) and age is not None and age < _stale_after(),
@@ -60,6 +69,14 @@ def status_payload(status, events, now: datetime, coins=()) -> dict:
             }
             for e in events
         ],
+        "pagination": {
+            "page": page,
+            "page_size": _PAGE_SIZE,
+            "total": total,
+            "total_pages": total_pages,
+            "has_prev": page > 1,
+            "has_next": page < total_pages,
+        },
     }
 
 
@@ -96,6 +113,11 @@ def render_html(payload: dict) -> str:
                      f"rel='noopener'>📈 Uptime</a>")
     links_html = f"<nav class='links'>{''.join(links)}</nav>" if links else ""
 
+    pg = payload.get("pagination") or {}
+    total = pg.get("total", len(payload["recent_events"]))
+    count_label = f" <span class='count'>({total} total)</span>" if total else ""
+    pager_html = _render_pager(pg)
+
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
@@ -125,6 +147,14 @@ def render_html(payload: dict) -> str:
   td.t {{ color:#8a93a6; white-space:nowrap; }}
   .tag {{ background:#1f2a44; color:#9db4ff; border-radius:5px; padding:.1rem .4rem; font-size:.75rem; }}
   .muted {{ color:#8a93a6; text-align:center; }}
+  .count {{ color:#8a93a6; font-weight:400; font-size:.8rem; }}
+  .pager {{ display:flex; align-items:center; justify-content:center; gap:1rem; margin-top:1rem; font-size:.85rem; }}
+  .pager a {{ text-decoration:none; background:#141925; border:1px solid #232a3a;
+    border-radius:8px; padding:.35rem .7rem; color:#9db4ff; }}
+  .pager a:hover {{ border-color:#3a4566; }}
+  .pager .disabled {{ color:#4a5366; border:1px solid #1a1f2b; border-radius:8px;
+    padding:.35rem .7rem; }}
+  .pager .pageinfo {{ color:#8a93a6; }}
   a {{ color:#9db4ff; }}
   .info {{ position:relative; cursor:help; color:#8a93a6; margin-left:.25rem; }}
   .info .tip {{ display:none; position:absolute; left:0; top:1.5em; z-index:10;
@@ -147,12 +177,29 @@ def render_html(payload: dict) -> str:
     <div class="card"><div class="k">Running since</div><div class="v" style="font-size:1rem">{payload['started_at_display']}</div></div>
     <div class="card"><div class="k">Errors (streak)</div><div class="v">{payload['consecutive_errors'] if payload['consecutive_errors'] is not None else '—'}</div></div>
   </div>
-  <h2 style="font-size:1rem;">Latest alerts</h2>
+  <h2 style="font-size:1rem;">Alerts history{count_label}</h2>
   <table><thead><tr><th>Time (UTC)</th><th>Type</th><th>Market</th><th>Change</th></tr></thead>
   <tbody>{rows}</tbody></table>
+  {pager_html}
   <footer>Live config changes on the <b>{html.escape(payload['dex'] or '')}</b> dex (Hyperliquid HIP-3).
   Auto-refresh 30s · <a href="/status.json">JSON</a></footer>
 </div></body></html>"""
+
+
+def _render_pager(pg: dict) -> str:
+    """Prev/next nav for the alerts history. Empty when there's a single page.
+
+    Page 1 = newest events; "Newer" goes to lower page numbers, "Older" to higher."""
+    total_pages = pg.get("total_pages", 1)
+    if total_pages <= 1:
+        return ""
+    page = pg["page"]
+    prev = (f"<a href='/?page={page - 1}'>← Newer</a>" if pg["has_prev"]
+            else "<span class='disabled'>← Newer</span>")
+    nxt = (f"<a href='/?page={page + 1}'>Older →</a>" if pg["has_next"]
+           else "<span class='disabled'>Older →</span>")
+    return (f"<nav class='pager'>{prev}"
+            f"<span class='pageinfo'>Page {page} / {total_pages}</span>{nxt}</nav>")
 
 
 def _change_cell(e: dict) -> str:
@@ -175,32 +222,56 @@ def _fmt_utc(dt, fmt: str) -> str:
 # --- app aiohttp ---
 
 async def _handle_index(request: web.Request) -> web.Response:
-    payload = await _build_payload(request.app)
+    payload = await _build_payload(request.app, _parse_page(request.query.get("page")))
     return web.Response(text=render_html(payload), content_type="text/html")
 
 
 async def _handle_json(request: web.Request) -> web.Response:
-    return web.json_response(await _build_payload(request.app))
+    # JSON stays on page 1 (newest events) — keeps the monitoring contract stable.
+    return web.json_response(await _build_payload(request.app, 1))
 
 
-async def _build_payload(app: web.Application) -> dict:
-    status, events, coins = await _read_cached(app)
-    return status_payload(status, events, datetime.now(timezone.utc), coins)
+def _parse_page(raw: str | None) -> int:
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 1
 
 
-async def _read_cached(app: web.Application):
-    """Read (status, events, coins) from the DB, with a TTL cache to limit load."""
+async def _build_payload(app: web.Application, page: int = 1) -> dict:
+    status, coins, total = await _read_base(app)
+    total_pages = max(1, -(-total // _PAGE_SIZE))  # ceil division
+    page = min(max(page, 1), total_pages)
+    events = await _page_events(app, (page - 1) * _PAGE_SIZE)
+    return status_payload(status, events, datetime.now(timezone.utc), coins,
+                          page=page, total=total)
+
+
+async def _read_base(app: web.Application):
+    """Page-independent reads (status, coins, total event count), TTL-cached.
+
+    Refreshing also clears the per-page events cache so a new alert shows up promptly."""
     cache = app["cache"]
     now = time.monotonic()
-    if cache["rows"] is None or now - cache["at"] > _CACHE_TTL_SEC:
+    if cache["base"] is None or now - cache["at"] > _CACHE_TTL_SEC:
         db: Database = app["db"]
-        cache["rows"] = (
+        cache["base"] = (
             await db.get_status(config.dex_name),
-            await db.recent_events(config.dex_name, 20),
             await db.list_coins(config.dex_name),
+            await db.count_events(config.dex_name),
         )
+        cache["events"] = {}
         cache["at"] = now
-    return cache["rows"]
+    return cache["base"]
+
+
+async def _page_events(app: web.Application, offset: int):
+    """A page of events, memoized per offset within the current cache window."""
+    cache = app["cache"]
+    if offset not in cache["events"]:
+        db: Database = app["db"]
+        cache["events"][offset] = await db.recent_events(config.dex_name, _PAGE_SIZE, offset)
+    return cache["events"][offset]
 
 
 async def _on_startup(app: web.Application) -> None:
@@ -208,7 +279,7 @@ async def _on_startup(app: web.Application) -> None:
     db = Database(config.web_pg_dsn or config.pg_dsn)
     await db.connect()
     app["db"] = db
-    app["cache"] = {"at": 0.0, "rows": None}
+    app["cache"] = {"at": 0.0, "base": None, "events": {}}
 
 
 async def _on_cleanup(app: web.Application) -> None:
