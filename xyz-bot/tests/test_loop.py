@@ -7,7 +7,7 @@ import src.main as main_mod
 from src.config import config
 from src.main import _ops_alert, api_alert_action, backoff_delay, run_cycle
 
-from .fixtures import META_RESPONSE, PERP_DEX_LIMITS_RESPONSE
+from .fixtures import META_RESPONSE, PERP_DEX_LIMITS_RESPONSE, PERP_DEXS_RESPONSE
 
 
 # --- backoff ---
@@ -46,14 +46,18 @@ def test_api_alert_recovers_once():
 # --- run_cycle (duck-typed client + notifier, no DB → memory fallback) ---
 
 class FakeClient:
-    def __init__(self, meta, limits):
+    def __init__(self, meta, limits, perp_dexs=None):
         self._meta, self._limits = meta, limits
+        self._perp_dexs = perp_dexs if perp_dexs is not None else PERP_DEXS_RESPONSE
 
     async def get_meta(self, dex):
         return self._meta
 
     async def get_perp_dex_limits(self, dex):
         return self._limits
+
+    async def get_perp_dexs(self):
+        return self._perp_dexs
 
     async def aclose(self):
         pass

@@ -9,6 +9,7 @@ import pytest
 
 from src.events import (
     DELISTED,
+    FUNDING_MULT_CHANGE,
     GROWTH_MODE_CHANGE,
     HALT,
     LEVERAGE_CHANGE,
@@ -56,6 +57,27 @@ def test_oi_cap_change():
     e = events[0]
     assert (e.event_type, e.coin, e.old_value, e.new_value) == (
         OI_CAP_CHANGE, "xyz:HOOD", "50000000.0", "100000000.0")
+
+
+def test_funding_mult_change():
+    prev = base_snapshot()
+    prev.coins["xyz:HOOD"].funding_mult = "0.5"
+    curr = copy.deepcopy(prev)
+    curr.coins["xyz:HOOD"].funding_mult = "0.75"
+    events = diff(prev, curr)
+    assert len(events) == 1
+    e = events[0]
+    assert (e.event_type, e.coin, e.old_value, e.new_value) == (
+        FUNDING_MULT_CHANGE, "xyz:HOOD", "0.5", "0.75")
+
+
+def test_funding_mult_none_edge_ignored():
+    """None → value (first cycle after the feature ships) must NOT fire, to avoid a burst
+    of spurious alerts for every market before the baseline is re-persisted."""
+    prev = base_snapshot()  # funding_mult defaults to None
+    curr = copy.deepcopy(prev)
+    curr.coins["xyz:HOOD"].funding_mult = "0.5"
+    assert diff(prev, curr) == []
 
 
 def test_total_oi_cap_change_is_dex_level():

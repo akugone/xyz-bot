@@ -46,12 +46,14 @@ def api_alert_action(errors: int, threshold: int, alerted: bool) -> str | None:
 
 
 async def fetch_snapshot(client: HyperliquidClient, dex: str) -> Snapshot:
-    """Fetch meta + perpDexLimits and build a per-coin snapshot."""
-    meta, limits = await asyncio.gather(
+    """Fetch meta + perpDexLimits + perpDexs and build a per-coin snapshot."""
+    meta, limits, perp_dexs = await asyncio.gather(
         client.get_meta(dex),
         client.get_perp_dex_limits(dex),
+        client.get_perp_dexs(),
     )
-    return build_snapshot(dex, meta, limits)
+    perp_dex = next((d for d in perp_dexs if isinstance(d, dict) and d.get("name") == dex), None)
+    return build_snapshot(dex, meta, limits, perp_dex)
 
 
 async def run_once() -> None:

@@ -1,6 +1,7 @@
 """Event → Telegram message formatting tests (pure, no network)."""
 from src.events import (
     DELISTED,
+    FUNDING_MULT_CHANGE,
     GROWTH_MODE_CHANGE,
     HALT,
     LEVERAGE_CHANGE,
@@ -65,6 +66,12 @@ def test_growth_mode():
     msg = format_event(Event("xyz", "xyz:HOOD", GROWTH_MODE_CHANGE, "enabled", "disabled"))
     assert "Growth mode · xyz:HOOD" in msg
     assert "enabled → disabled" in msg
+
+
+def test_funding_multiplier():
+    msg = format_event(Event("xyz", "xyz:NVDA", FUNDING_MULT_CHANGE, "0.5", "0.75"))
+    assert "Funding multiplier · xyz:NVDA" in msg
+    assert "0.5 → 0.75" in msg
 
 
 def test_halt_and_unhalt():

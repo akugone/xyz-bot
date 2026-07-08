@@ -4,11 +4,22 @@ No network: `build_snapshot` is fed with fixtures captured from the real API.
 """
 from src.snapshot import build_snapshot
 
-from .fixtures import META_RESPONSE, PERP_DEX_LIMITS_RESPONSE
+from .fixtures import META_RESPONSE, PERP_DEX_LIMITS_RESPONSE, XYZ_PERP_DEX
 
 
 def make_snapshot():
-    return build_snapshot("xyz", META_RESPONSE, PERP_DEX_LIMITS_RESPONSE)
+    return build_snapshot("xyz", META_RESPONSE, PERP_DEX_LIMITS_RESPONSE, XYZ_PERP_DEX)
+
+
+def test_funding_multiplier_parsed():
+    hood = make_snapshot().coins["xyz:HOOD"]
+    assert hood.funding_mult == "0.5"
+
+
+def test_funding_multiplier_absent_when_no_perp_dex():
+    # perp_dex omitted (e.g. endpoint unavailable) → funding_mult stays None, no crash
+    snap = build_snapshot("xyz", META_RESPONSE, PERP_DEX_LIMITS_RESPONSE)
+    assert snap.coins["xyz:HOOD"].funding_mult is None
 
 
 def test_snapshot_basics():

@@ -34,6 +34,11 @@ class HyperliquidClient:
         """totalOiCap, oiSzCapPerPerp, maxTransferNtl, coinToOiCap (the OI caps)."""
         return await self._post({"type": "perpDexLimits", "dex": dex})
 
+    async def get_perp_dexs(self) -> list[Any]:
+        """All builder-deployed perp dexes (no `dex` arg). Each entry has the deployer-level
+        config: assetToFundingMultiplier, deployerFeeScale, feeRecipient, subDeployers…"""
+        return await self._post({"type": "perpDexs"})
+
     # Supplementary endpoints (metaAndAssetCtxs, perpsAtOpenInterestCap) intentionally not
     # included: reintroduce them if we wire the pre-OI-increase signal (M6).
 

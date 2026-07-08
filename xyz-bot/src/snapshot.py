@@ -32,11 +32,17 @@ class Snapshot:
     coins: dict[str, CoinState] = field(default_factory=dict)
 
 
-def build_snapshot(dex: str, meta: dict[str, Any], limits: dict[str, Any]) -> Snapshot:
-    """Build a Snapshot from the `meta` and `perpDexLimits` responses."""
+def build_snapshot(dex: str, meta: dict[str, Any], limits: dict[str, Any],
+                   perp_dex: dict[str, Any] | None = None) -> Snapshot:
+    """Build a Snapshot from `meta`, `perpDexLimits`, and (optionally) the `perpDexs` entry
+    for this dex (source of the per-asset funding multiplier)."""
     snap = Snapshot(dex=dex, total_oi_cap=none_or_str(limits.get("totalOiCap")))
 
     oi_caps = {coin: none_or_str(cap) for coin, cap in limits.get("coinToOiCap", [])}
+    funding_mults = {
+        coin: none_or_str(m)
+        for coin, m in (perp_dex or {}).get("assetToFundingMultiplier", [])
+    }
 
     for u in meta.get("universe", []):
         name = u["name"]
@@ -48,8 +54,8 @@ def build_snapshot(dex: str, meta: dict[str, Any], limits: dict[str, Any]) -> Sn
             oi_cap=oi_caps.get(name),
             is_listed=not u.get("isDelisted", False),
             is_halted=u.get("isHalted"),  # absent while no market is halted; confirm on a real halt
+            funding_mult=funding_mults.get(name),
             growth_mode=_growth(u.get("growthMode")),
-            # funding_mult: not in `meta` (see perpDexs.assetToFundingMultiplier) — wire later
         )
     return snap
 

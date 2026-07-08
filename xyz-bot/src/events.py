@@ -26,6 +26,7 @@ TOTAL_OI_CAP_CHANGE = "total_oi_cap_change"
 MARGIN_MODE_CHANGE = "margin_mode_change"
 LEVERAGE_CHANGE = "leverage_change"
 GROWTH_MODE_CHANGE = "growth_mode_change"
+FUNDING_MULT_CHANGE = "funding_mult_change"
 HALT = "halt"
 UNHALT = "unhalt"
 DELISTED = "delisted"
@@ -93,6 +94,13 @@ def diff(prev: Snapshot | None, curr: Snapshot) -> list[Event]:
                 and p.growth_mode != c.growth_mode:
             events.append(Event(dex, coin, GROWTH_MODE_CHANGE,
                                 _growth_label(p.growth_mode), _growth_label(c.growth_mode)))
+
+        # funding multiplier changed. Ignore None edges (e.g. first cycle after the feature
+        # ships, when the persisted baseline predates the funding_mult column) to avoid a
+        # spurious burst of alerts for every market.
+        if p.funding_mult is not None and c.funding_mult is not None \
+                and p.funding_mult != c.funding_mult:
+            events.append(Event(dex, coin, FUNDING_MULT_CHANGE, p.funding_mult, c.funding_mult))
 
         # halt / resume — API mechanism to confirm (see HANDOVER.md).
         # Implemented provisionally by treating is_halted absent/None = not halted.

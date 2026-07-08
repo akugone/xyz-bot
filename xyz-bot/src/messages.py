@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 from .events import (
     DELISTED,
+    FUNDING_MULT_CHANGE,
     GROWTH_MODE_CHANGE,
     HALT,
     LEVERAGE_CHANGE,
@@ -59,6 +60,9 @@ def event_parts(ev: Event) -> EventParts:
 
     if t == GROWTH_MODE_CHANGE:
         return EventParts("🌱", "Growth mode", coin, f"{ev.old_value} → {ev.new_value}")
+
+    if t == FUNDING_MULT_CHANGE:
+        return EventParts("💸", "Funding multiplier", coin, f"{ev.old_value} → {ev.new_value}")
 
     if t == NEW_MARKET:
         return EventParts("🆕", "New market listed", coin, _new_market_detail(ev.new_value))

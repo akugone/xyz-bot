@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .events import (
     DELISTED,
+    FUNDING_MULT_CHANGE,
     GROWTH_MODE_CHANGE,
     HALT,
     LEVERAGE_CHANGE,
@@ -53,6 +54,7 @@ _SUB = (160, 174, 184)
 _GREEN = (45, 212, 120)
 _BLUE = (90, 170, 255)
 _RED = (240, 90, 90)
+_AMBER = (230, 180, 70)
 
 # event_type → accent color of the badge line
 _ACCENT = {
@@ -64,6 +66,7 @@ _ACCENT = {
     RELISTED: _GREEN,
     MARGIN_MODE_CHANGE: _BLUE,
     LEVERAGE_CHANGE: _BLUE,
+    FUNDING_MULT_CHANGE: _AMBER,
     HALT: _RED,
     DELISTED: _RED,
 }

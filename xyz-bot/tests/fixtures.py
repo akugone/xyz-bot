@@ -53,3 +53,22 @@ PERP_DEX_LIMITS_RESPONSE = {
         ["xyz:DXY", "25000000.0"],
     ],
 }
+
+# `perpDexs` returns ALL dexes; the xyz entry carries the deployer-level config.
+# Reduced here to the funding multiplier (the field we track).
+PERP_DEXS_RESPONSE = [
+    None,  # index 0 is the empty/native dex in the real response
+    {
+        "name": "xyz",
+        "fullName": "XYZ",
+        "deployer": "0x88806a71d74ad0a510b350545c9ae490912f0888",
+        "deployerFeeScale": "1.0",
+        "assetToFundingMultiplier": [
+            ["xyz:HOOD", "0.5"],
+            ["xyz:MINIMAX", "0.5"],
+            ["xyz:XYZ100", "0.5"],
+            ["xyz:DXY", "0.5"],
+        ],
+    },
+]
+XYZ_PERP_DEX = PERP_DEXS_RESPONSE[1]
