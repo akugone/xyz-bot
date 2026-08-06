@@ -84,8 +84,8 @@ def test_delisted():
 
 
 def test_relisted():
-    # RELISTED event is surfaced with the internal xyz wording "Unhalted"
-    assert "Unhalted · xyz:ZHIPU" in format_event(Event("xyz", "xyz:ZHIPU", RELISTED, "delisted", "listed"))
+    # RELISTED event is surfaced with the internal xyz wording "Market unhalted"
+    assert "Market unhalted · xyz:ZHIPU" in format_event(Event("xyz", "xyz:ZHIPU", RELISTED, "delisted", "listed"))
 
 
 def test_amount_keeps_non_integer_and_raw():

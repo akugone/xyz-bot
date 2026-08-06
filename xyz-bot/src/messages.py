@@ -78,7 +78,7 @@ def event_parts(ev: Event) -> EventParts:
 
     if t == RELISTED:
         # internal xyz wording is "unhalted" (this maps on-chain to haltTrading{isHalted:false})
-        return EventParts("✅", "Unhalted", coin, None)
+        return EventParts("✅", "Market unhalted", coin, None)
 
     # generic fallback (shouldn't happen if all types are handled)
     return EventParts("ℹ️", t, coin, f"{ev.old_value} → {ev.new_value}")
