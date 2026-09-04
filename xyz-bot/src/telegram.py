@@ -21,7 +21,8 @@ class TelegramNotifier:
         chat_id: str | None,
         dry_run: bool = False,
         client: httpx.AsyncClient | None = None,
-        timeout: float = 10.0,
+        timeout: float = 30.0,  # photo uploads can be slow; 10s was too tight and caused
+                                # false ReadTimeouts that duplicated alerts (card + text fallback)
     ):
         self._token = token
         self._chat_id = chat_id

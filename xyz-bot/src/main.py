@@ -96,11 +96,21 @@ async def run_cycle(
                      ev.event_type, ev.coin or "(dex)", ev.old_value, ev.new_value)
             caption = format_event(ev)
             try:
-                await notifier.send_photo(render_card(ev), caption=caption)
+                card = render_card(ev)
             except Exception:
-                # never drop an alert because of image rendering — fall back to plain text
-                log.exception("card render/send failed for %s; sending text", ev.event_type)
+                # the CARD couldn't be built → fall back to plain text (a card render bug
+                # must not drop the alert). This is safe: nothing was sent yet.
+                log.exception("card render failed for %s; sending text instead", ev.event_type)
                 await notifier.send(caption)
+            else:
+                try:
+                    await notifier.send_photo(card, caption=caption)
+                except Exception:
+                    # a SEND failure (typically a ReadTimeout on a slow-but-delivered photo)
+                    # must NOT fall back to text — that double-posts (card + text). Just log it;
+                    # the 30s client timeout makes real send failures rare.
+                    log.exception("send_photo failed for %s (no text fallback — avoids duplicate)",
+                                  ev.event_type)
             sent.append(ev.dedup_key)
         if db is not None and sent:
             await db.mark_notified(sent)
