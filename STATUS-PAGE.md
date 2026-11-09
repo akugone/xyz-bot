@@ -9,10 +9,10 @@
 
 | | URL |
 |---|---|
-| **HTML page** (humans) | **http://217.65.145.163:8080/** |
-| **JSON** (monitoring / machine) | http://217.65.145.163:8080/status.json |
+| **HTML page** (humans) | **http://<VPS_IP>:8080/** |
+| **JSON** (monitoring / machine) | http://<VPS_IP>:8080/status.json |
 
-- Hosted on the **bot's VPS** (Hostinger, Ubuntu 24.04, IP `217.65.145.163`).
+- Hosted on the **bot's VPS** (Hostinger, Ubuntu 24.04, IP `<VPS_IP>`).
 - **Plain HTTP** (port 8080), no HTTPS or domain yet — see [Roadmap](#roadmap).
 - The page **auto-refreshes every 30s**.
 - **Read-only and public**: no sensitive data (everything comes from the public Hyperliquid API).
@@ -78,7 +78,7 @@
 ## Operations (reminder)
 
 ```bash
-ssh root@217.65.145.163
+ssh root@<VPS_IP>
 systemctl status xyz-bot-web          # page status
 systemctl restart xyz-bot-web         # restart
 journalctl -u xyz-bot-web -f          # logs

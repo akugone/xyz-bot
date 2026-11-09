@@ -4,16 +4,16 @@ Cheat sheet of common commands. The bot runs as a systemd daemon on the Hostinge
 
 | | |
 |---|---|
-| **Server** | Ubuntu 24.04 — `217.65.145.163` |
-| **Login** | `ssh root@217.65.145.163` (SSH key only, password auth disabled) |
+| **Server** | Ubuntu 24.04 — `<VPS_IP>` |
+| **Login** | `ssh root@<VPS_IP>` (SSH key only, password auth disabled) |
 | **Services** | `xyz-bot` (daemon) + `xyz-bot-web` (status page) — systemd, `active` + `enabled` |
-| **Status page** | http://217.65.145.163:8080/ (HTML) · `/status.json` (JSON) |
+| **Status page** | http://<VPS_IP>:8080/ (HTML) · `/status.json` (JSON) |
 | **Code** | `/opt/xyz-bot` (venv `.venv`, secrets `.env`) |
 | **Database** | local Postgres 16 — db `xyzbot`, user `xyzbot` |
 | **Channel** | Telegram "XYZ Deployer Alerts" via `@tradexyz_alerts_bot` |
 
 > Tip: everything below can be run **from your Mac** by prefixing with
-> `ssh root@217.65.145.163 '<command>'`, or after connecting with `ssh root@217.65.145.163`.
+> `ssh root@<VPS_IP> '<command>'`, or after connecting with `ssh root@<VPS_IP>`.
 
 ---
 
@@ -39,8 +39,8 @@ systemctl restart xyz-bot         # restart
 ## Status page
 
 ```bash
-curl -s http://217.65.145.163:8080/status.json   # machine-readable status
-# HTML page: open http://217.65.145.163:8080/ in a browser
+curl -s http://<VPS_IP>:8080/status.json   # machine-readable status
+# HTML page: open http://<VPS_IP>:8080/ in a browser
 systemctl restart xyz-bot-web                     # restart the page
 ```
 
@@ -89,19 +89,19 @@ From your **Mac**, at the `~/dev/xyz` root:
 ```bash
 rsync -az --delete \
   --exclude .venv --exclude .env --exclude __pycache__ --exclude .pytest_cache \
-  xyz-bot/ root@217.65.145.163:/opt/xyz-bot/
-ssh root@217.65.145.163 'chown -R xyzbot:xyzbot /opt/xyz-bot && systemctl restart xyz-bot xyz-bot-web'
+  xyz-bot/ root@<VPS_IP>:/opt/xyz-bot/
+ssh root@<VPS_IP> 'chown -R xyzbot:xyzbot /opt/xyz-bot && systemctl restart xyz-bot xyz-bot-web'
 ```
 If dependencies changed (`requirements.txt`):
 ```bash
-ssh root@217.65.145.163 '/opt/xyz-bot/.venv/bin/pip install -r /opt/xyz-bot/requirements.txt && systemctl restart xyz-bot xyz-bot-web'
+ssh root@<VPS_IP> '/opt/xyz-bot/.venv/bin/pip install -r /opt/xyz-bot/requirements.txt && systemctl restart xyz-bot xyz-bot-web'
 ```
 
 ## Change the config (.env)
 
 ```bash
-ssh root@217.65.145.163 'nano /opt/xyz-bot/.env'    # edit
-ssh root@217.65.145.163 'systemctl restart xyz-bot' # apply
+ssh root@<VPS_IP> 'nano /opt/xyz-bot/.env'    # edit
+ssh root@<VPS_IP> 'systemctl restart xyz-bot' # apply
 ```
 Variables: `POLL_INTERVAL_SEC`, `DEX_NAME`, `PG_DSN`, `WEB_PG_DSN`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_CHAT_ID`, `TELEGRAM_ADMIN_CHAT_ID`, `TELEGRAM_DRY_RUN`, `API_DOWN_THRESHOLD`,

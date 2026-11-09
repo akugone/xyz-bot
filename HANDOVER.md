@@ -16,7 +16,7 @@
 | **M2 — Diff & persistence** | ✅ | diff engine + Postgres (asyncpg). Baseline survives restart (seed only on empty DB) |
 | **M3 — Notifications** | ✅ | templates + Telegram, **live sending validated** to the broadcast channel "XYZ Deployer Alerts" (`@tradexyz_alerts_bot`, bot is admin). Public messages in **English** |
 | **M4 — Daemon & deploy** | ✅ | **in production** on a Hostinger VPS (Ubuntu 24.04), systemd active + enabled at boot, local Postgres. Runs 24/7 |
-| **Public status page** | ✅ | separate web service, read-only DB role, http://217.65.145.163:8080/. Tokens tooltip, absolute "Last check", "Running since", header links (Telegram + Uptime) |
+| **Public status page** | ✅ | separate web service, read-only DB role, http://<VPS_IP>:8080/. Tokens tooltip, absolute "Last check", "Running since", header links (Telegram + Uptime) |
 | **External monitoring** | ✅ | BetterStack pings `/status.json` → public uptime page (https://xyzbot.betteruptime.com/) + alert if the VPS itself goes down (closes the watcher blind spot) |
 | **Code review & hardening** | ✅ | dedup of helpers, dead code removed, least privilege, SSH/systemd hardening |
 | **M5 — Hardening** | ⏳ | rate limits verified, API-down alert done, end-to-end validated on a real change (controlled test). Remaining: confirm the halt mechanism |
@@ -74,7 +74,7 @@
 - **2026-06-21** — M3 done: `src/messages.py` + `src/telegram.py`, wired into the loop. Bot
   `@tradexyz_alerts_bot` created, broadcast channel set up, live sending validated. Public messages
   switched to English (international audience).
-- **2026-06-21** — M4 deployed to production: Hostinger VPS Ubuntu 24.04 (`217.65.145.163`), local
+- **2026-06-21** — M4 deployed to production: Hostinger VPS Ubuntu 24.04 (`<VPS_IP>`), local
   Postgres 16, systemd `xyz-bot` active + enabled. Persistence validated on the VPS.
 - **2026-06-21** — Public status page added (`src/web.py`, aiohttp, read-only DB role) + SSH/systemd
   hardening + ops docs.
