@@ -1,4 +1,4 @@
-# Deployment — xyz-bot on a VPS (Hostinger, Ubuntu)
+# Deployment — xyz-bot on a VPS (OVH, Ubuntu)
 
 Runbook to run the bot 24/7 as a systemd daemon. Target: Ubuntu 22.04/24.04 VPS.
 All commands run **on the VPS** (as root over SSH) unless stated otherwise.

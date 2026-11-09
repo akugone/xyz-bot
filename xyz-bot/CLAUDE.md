@@ -43,7 +43,7 @@ loop every N s (target 2–5 s):
   5. persist   the new snapshot + heartbeat
   6. sleep N s
 ```
-Runs as a daemon under **systemd** (`Restart=always`) on a Hostinger VPS with a local Postgres.
+Runs as a daemon under **systemd** (`Restart=always`) on an OVH VPS with a local Postgres.
 
 ## Endpoints used
 - `perpDexLimits` (dex="xyz") → `totalOiCap`, `coinToOiCap` (the OI caps, data point #1).

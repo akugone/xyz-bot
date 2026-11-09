@@ -1,6 +1,6 @@
 # OPS — operating the xyz-bot (production)
 
-Cheat sheet of common commands. The bot runs as a systemd daemon on the Hostinger VPS.
+Cheat sheet of common commands. The bot runs as a systemd daemon on the OVH VPS.
 
 | | |
 |---|---|

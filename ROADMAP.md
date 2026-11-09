@@ -11,7 +11,7 @@
 - **M1 — Read**: Hyperliquid info API client + per-coin snapshot (93 markets).
 - **M2 — Diff + persistence**: diff engine (typed events, dedup), Postgres (silent seed, survives restart).
 - **M3 — Notifications**: Telegram sending to the broadcast channel "XYZ Deployer Alerts" (messages in **English**).
-- **M4 — Deployment**: hardened daemon (backoff, heartbeat, graceful shutdown) in production on a Hostinger VPS, systemd, 24/7.
+- **M4 — Deployment**: hardened daemon (backoff, heartbeat, graceful shutdown) in production on an OVH VPS, systemd, 24/7.
 - **Public status page**: http://<VPS_IP>:8080/ (read-only DB role, cache, hardened units).
   Enriched: tracked-tokens tooltip, OI-cap amounts formatted, "Last check" as absolute UTC time,
   "Running since" (uptime), header links (Telegram + Uptime).

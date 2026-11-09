@@ -12,7 +12,7 @@
 | **HTML page** (humans) | **http://<VPS_IP>:8080/** |
 | **JSON** (monitoring / machine) | http://<VPS_IP>:8080/status.json |
 
-- Hosted on the **bot's VPS** (Hostinger, Ubuntu 24.04, IP `<VPS_IP>`).
+- Hosted on the **bot's VPS** (OVH, Ubuntu 24.04, IP `<VPS_IP>`).
 - **Plain HTTP** (port 8080), no HTTPS or domain yet — see [Roadmap](#roadmap).
 - The page **auto-refreshes every 30s**.
 - **Read-only and public**: no sensitive data (everything comes from the public Hyperliquid API).
@@ -95,5 +95,5 @@ Full details: `xyz-bot/deploy/OPS.md`.
 
 ## Limits / good to know
 - The **IP may change** if the VPS is recreated → the URL would change (a fixed domain solves this).
-- Port **8080**: if blocked by a cloud firewall, open it on the Hostinger side.
+- Port **8080**: if blocked by a cloud firewall, open it on the OVH side.
 - No authentication: the page is **public by design** (status + alerts = public info).

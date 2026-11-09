@@ -9,7 +9,7 @@ signing, no trading.
 > **Live**
 > - Telegram channel: **XYZ Deployer Alerts** (via `@tradexyz_alerts_bot`)
 > - Public status page: **http://<VPS_IP>:8080/** (`/status.json` for monitoring)
-> - Runs 24/7 on a Hostinger VPS (systemd).
+> - Runs 24/7 on an OVH VPS (systemd).
 
 ## Why a snapshot diff?
 
